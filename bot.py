@@ -163,7 +163,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "messages": 0,
             "unlocked": False,
             "history": [],
-            "stickers_since_last": 0,
+            "bot_sent": 0,
             "last_interaction": datetime.utcnow().isoformat()
         }
         save_data()
@@ -211,26 +211,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
 
-    # Controle envio de figurinha a cada 10 mensagens
-    user_data[user_id]["stickers_since_last"] = user_data[user_id].get("stickers_since_last", 0) + 1
-    if user_data[user_id]["stickers_since_last"] >= 25:
-        # Enviar figurinha
-        sticker_file_id = "CAACAgIAAxkBAAECx1Fg5r...SeuFileIdAqui"  # Substitua pelo seu sticker válido
-        try:
-            await bot.send_sticker(chat_id=update.effective_chat.id, sticker=sticker_file_id)
-        except Exception as e:
-            logging.error(f"[ERROR send_sticker] {e}")
-        user_data[user_id]["stickers_since_last"] = 0  # Reset contador
-
     # Gera resposta IA
     reply = await generate_response(user_id, text_raw)
     user_data[user_id]["messages"] += 1
+    user_data[user_id]["bot_sent"] += 1
     save_data()
 
     await send_multiple_messages(update, reply)
 
+    # ✅ Enviar figurinha a cada 15 respostas do BOT
+    if user_data[user_id]["bot_sent"] % 15 == 0:
+        try:
+            sticker_file_id = "CAACAgIAAxkBAAECx1Fg5r...SeuFileIdAqui"  # Substitua por ID válido
+            await bot.send_sticker(chat_id=update.effective_chat.id, sticker=sticker_file_id)
+        except Exception as e:
+            logging.error(f"[ERROR send_sticker] {e}")
+
+# === Handler para /start com saudação e pergunta nome ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await simulate_typing(update)
+    await update.message.reply_text("Hey there, handsome 😘")
+    await asyncio.sleep(2)
+    await update.message.reply_text("What's your name? 💕")
+
 # === Adicionar Handlers ===
-application.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("Hey there… what’s on your mind today? 😉")))
+application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 # === Rotas FastAPI ===
@@ -253,8 +258,7 @@ async def startup_event():
     await application.start()
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
-    # Inicia verificação de inatividade
-    asyncio.create_task(check_inactivity())
+    asyncio.create_task(check_inactivity())  # Inicia verificação de inatividade
 
 @app.on_event("shutdown")
 async def shutdown_event():
