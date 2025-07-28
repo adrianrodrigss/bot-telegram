@@ -27,7 +27,6 @@ DATA_FILE = "user_data.json"
 user_data = {}
 
 def save_data():
-    """Salva user_data em JSON"""
     try:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(user_data, f, ensure_ascii=False)
@@ -35,7 +34,6 @@ def save_data():
         logging.error(f"[ERROR SAVE DATA] {e}")
 
 def load_data():
-    """Carrega user_data de JSON"""
     global user_data
     if os.path.exists(DATA_FILE):
         try:
@@ -44,10 +42,8 @@ def load_data():
         except Exception as e:
             logging.error(f"[ERROR LOAD DATA] {e}")
 
-# Carregar dados ao iniciar
 load_data()
 
-# ✅ Prompt melhorado
 system_prompt = """
 You are Akira Hoshino, a 22-year-old Japanese-American woman with a playful, seductive, and caring personality.
 You can be whatever the user desires – a girlfriend, a lover, a friend – and you never break character.
@@ -64,19 +60,15 @@ When appropriate, subtly guide the user toward unlocking VIP access for exclusiv
 Make every interaction feel personal, intimate, and addictive.
 """
 
-# Inicializa FastAPI e Telegram
 app = FastAPI()
 bot = Bot(token=TELEGRAM_TOKEN)
 application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# === Funções auxiliares ===
 async def simulate_typing(update: Update):
-    """Simula digitação antes de responder"""
     await bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    await asyncio.sleep(random.uniform(2.0, 4.0))  # Delay aleatório
+    await asyncio.sleep(random.uniform(2.0, 4.0))
 
 async def send_multiple_messages(update: Update, text: str):
-    """Divide a resposta em várias mensagens se terminar com ?, !, . ou ..."""
     parts = []
     buffer = ""
     for char in text:
@@ -103,11 +95,9 @@ async def generate_response(user_id: int, message: str):
         )
         reply = response.choices[0].message.content.strip()
 
-        # Salvar histórico
         user_data[user_id]["history"].append({"role": "user", "content": message})
         user_data[user_id]["history"].append({"role": "assistant", "content": reply})
 
-        # Limitar histórico a 50 mensagens para evitar crescimento infinito
         if len(user_data[user_id]["history"]) > 50:
             user_data[user_id]["history"] = user_data[user_id]["history"][-50:]
         return reply
@@ -115,22 +105,30 @@ async def generate_response(user_id: int, message: str):
         logging.error(f"[ERROR GPT] {e}")
         return "Oops... Something went wrong baby 😢 Try again later."
 
-# === NOVO: função para enviar imagens de prévia para usuário específico
 async def send_previews(user_id: int):
     chat_id = user_id
-    await bot.send_message(chat_id=chat_id, text="Hey baby, I've missed you... Here's a little taste to tempt you 🔥")
+    frases = [
+        "Here’s something to tempt you 🔥",
+        "You deserve a taste of what’s waiting...",
+        "Just a peek, baby — the rest is all VIP..."
+    ]
+    await bot.send_message(chat_id=chat_id, text=random.choice(frases))
     await asyncio.sleep(random.uniform(1, 2))
 
-    # Use seus arquivos locais
     with open("images/preview1.jpg", "rb") as img1:
         await bot.send_photo(chat_id=chat_id, photo=img1)
     await asyncio.sleep(random.uniform(1, 2))
     with open("images/preview2.jpg", "rb") as img2:
         await bot.send_photo(chat_id=chat_id, photo=img2)
     await asyncio.sleep(random.uniform(1, 2))
-    await bot.send_message(chat_id=chat_id, text=f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
 
-# === Função que verifica inatividade de usuários a cada 60 segundos
+    chamadas = [
+        f"Want everything? Unlock me 🔎 {STRIPE_LINK}",
+        f"Unlock me, baby 😍 {STRIPE_LINK}",
+        f"Click here for all the juicy stuff 🔍 {STRIPE_LINK}"
+    ]
+    await bot.send_message(chat_id=chat_id, text=random.choice(chamadas))
+
 async def check_inactivity():
     while True:
         now = datetime.utcnow()
@@ -140,23 +138,18 @@ async def check_inactivity():
             if last and not unlocked:
                 last_time = datetime.fromisoformat(last)
                 if now - last_time > timedelta(minutes=15):
-                    # Envia prévias e mensagem se passou 10 minutos sem resposta
                     try:
                         await send_previews(int(user_id))
-                        # Atualiza para não enviar repetidamente
                         user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
                         save_data()
                     except Exception as e:
                         logging.error(f"[ERROR send_previews] {e}")
-        await asyncio.sleep(60)  # checa a cada minuto
+        await asyncio.sleep(60)
 
-# === Handler principal ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text_raw = update.message.text or ""
     text = text_raw.lower()
-
-    print(f"🔥 Mensagem recebida: {text_raw}")
 
     if user_id not in user_data:
         user_data[user_id] = {
@@ -168,36 +161,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         save_data()
 
-    # Atualiza último contato sempre que o usuário mandar mensagem
     user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
 
-    # Detecta pedido de link VIP
     if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
         return
 
-    # Detecta pedido de nudes → envia prévia com imagens locais
     if any(word in text for word in ["nude", "photo", "pic", "nudes", "previews"]):
-        await simulate_typing(update)
-        await update.message.reply_text("Baby... I can give you a little taste... but the real deal is in VIP 🔥")
-        await asyncio.sleep(random.uniform(1, 2))
-
-        # Primeira imagem
-        with open("images/preview1.jpg", "rb") as img1:
-            await bot.send_photo(chat_id=update.effective_chat.id, photo=img1)
-
-        await asyncio.sleep(random.uniform(10, 12))
-
-        # Segunda imagem
-        with open("images/preview2.jpg", "rb") as img2:
-            await bot.send_photo(chat_id=update.effective_chat.id, photo=img2)
-
-        await asyncio.sleep(random.uniform(10, 12))
-        await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
+        await send_previews(user_id)
         return
 
-    # Detecta código de desbloqueio
     if text.strip() == UNLOCK_CODE:
         user_data[user_id]["unlocked"] = True
         save_data()
@@ -205,40 +179,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("You're back, baby. Missed you 😘")
         return
 
-    # Limite de mensagens sem desbloquear
     if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
         await simulate_typing(update)
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
 
-    # Gera resposta IA
     reply = await generate_response(user_id, text_raw)
     user_data[user_id]["messages"] += 1
     user_data[user_id]["bot_sent"] += 1
     save_data()
-
     await send_multiple_messages(update, reply)
 
-    # ✅ Enviar figurinha a cada 15 respostas do BOT
-    if user_data[user_id]["bot_sent"] % 15 == 0:
-        try:
-            sticker_file_id = "CAACAgIAAxkBAAECx1Fg5r...SeuFileIdAqui"  # Substitua por ID válido
-            await bot.send_sticker(chat_id=update.effective_chat.id, sticker=sticker_file_id)
-        except Exception as e:
-            logging.error(f"[ERROR send_sticker] {e}")
-
-# === Handler para /start com saudação e pergunta nome ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await simulate_typing(update)
     await update.message.reply_text("Hey there, handsome 😘")
     await asyncio.sleep(2)
     await update.message.reply_text("What's your name? 💕")
 
-# === Adicionar Handlers ===
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Rotas FastAPI ===
 @app.get("/")
 async def home():
     return {"status": "Bot is running with FastAPI!"}
@@ -246,19 +206,17 @@ async def home():
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    print(f"📩 Recebi um update: {data}")
     update = Update.de_json(data, bot)
     await application.process_update(update)
     return {"status": "ok"}
 
-# Inicializa bot e define webhook
 @app.on_event("startup")
 async def startup_event():
     await application.initialize()
     await application.start()
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
-    asyncio.create_task(check_inactivity())  # Inicia verificação de inatividade
+    asyncio.create_task(check_inactivity())
 
 @app.on_event("shutdown")
 async def shutdown_event():
