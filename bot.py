@@ -19,8 +19,8 @@ UNLOCK_CODE = os.getenv("UNLOCK_CODE")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 # Links das imagens de prévia
-IMAGE_PREVIEW_1 = "https://ibb.co/MxvHvvRm"
-IMAGE_PREVIEW_2 = "https://ibb.co/nqy3FT3r"
+IMAGE_PREVIEW_1 = "https://i.ibb.co/Q3gVgg64/image.png"
+IMAGE_PREVIEW_2 = "https://i.ibb.co/HLyNj0N7/image.png"
 
 # Inicializa cliente OpenAI
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
