@@ -129,16 +129,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
         return
 
-    # Detecta código de desbloqueio
-    if text.strip() == UNLOCK_CODE:
-        user_data[user_id]["unlocked"] = True
-        save_data()
+    # Detecta pedido de nudes → envia prévia
+    if any(word in text for word in ["nude", "photo", "pic", "nudes", "previews"]):
         await simulate_typing(update)
-        await update.message.reply_text("You're back, baby. Missed you 😘")
-        return
+        await update.message.reply_text("Baby... I can give you a little taste... but the real deal is in VIP 🔥")
+        await asyncio.sleep(random.uniform(1, 2))
+
+    # Primeira imagem
+    with open("images/preview1.jpg", "rb") as img1:
+        await bot.send_photo(chat_id=update.effective_chat.id, photo=img1)
+
+        await asyncio.sleep(random.uniform(1, 2))
+
+    # Segunda imagem
+    with open("images/preview2.jpg", "rb") as img2:
+        await bot.send_photo(chat_id=update.effective_chat.id, photo=img2)
+
+    await asyncio.sleep(random.uniform(1, 2))
+    await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
+    return
 
     # Limite de mensagens sem desbloquear
-    if user_data[user_id]["messages"] >= 35 and not user_data[user_id]["unlocked"]:
+    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
         await simulate_typing(update)
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
