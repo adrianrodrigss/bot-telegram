@@ -115,8 +115,9 @@ def home():
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
+    loop.create_task(application.process_update(update))
     return "OK"
+    print("Recebi um update:", request.get_json(force=True))
 
 async def init_bot():
     await application.initialize()
