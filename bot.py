@@ -130,17 +130,17 @@ def home():
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.get_json(force=True)
-    print("📩 Recebi um update:", data)
-    update = Update.de_json(data, bot)
-
-    # Executa a task e loga erros
-    async def process():
-        try:
-            await application.process_update(update)
-            print("✅ Update processado com sucesso!")
-        except Exception as e:
-            print(f"❌ Erro ao processar update: {e}")
+    try:
+        update = Update.de_json(request.get_json(force=True), bot)
+        print(f"📩 Recebi um update: {request.get_json(force=True)}")
+        
+        # Agendar processamento no loop assíncrono
+        asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
+        
+        return "OK"
+    except Exception as e:
+        print(f"❌ Erro no webhook: {e}")
+        return "ERROR", 500
 
     loop.create_task(process())
     return "OK"
