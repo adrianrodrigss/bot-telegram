@@ -3,6 +3,7 @@ import os
 import asyncio
 import random
 import logging
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Request
 from telegram import Update, Bot
 from telegram.constants import ChatAction
@@ -114,6 +115,41 @@ async def generate_response(user_id: int, message: str):
         logging.error(f"[ERROR GPT] {e}")
         return "Oops... Something went wrong baby 😢 Try again later."
 
+# === NOVO: função para enviar imagens de prévia para usuário específico
+async def send_previews(user_id: int):
+    chat_id = user_id
+    await bot.send_message(chat_id=chat_id, text="Hey baby, I've missed you... Here's a little taste to tempt you 🔥")
+    await asyncio.sleep(random.uniform(1, 2))
+
+    # Use seus arquivos locais
+    with open("images/preview1.jpg", "rb") as img1:
+        await bot.send_photo(chat_id=chat_id, photo=img1)
+    await asyncio.sleep(random.uniform(1, 2))
+    with open("images/preview2.jpg", "rb") as img2:
+        await bot.send_photo(chat_id=chat_id, photo=img2)
+    await asyncio.sleep(random.uniform(1, 2))
+    await bot.send_message(chat_id=chat_id, text=f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
+
+# === Função que verifica inatividade de usuários a cada 60 segundos
+async def check_inactivity():
+    while True:
+        now = datetime.utcnow()
+        for user_id, data in user_data.items():
+            last = data.get("last_interaction")
+            unlocked = data.get("unlocked", False)
+            if last and not unlocked:
+                last_time = datetime.fromisoformat(last)
+                if now - last_time > timedelta(minutes=10):
+                    # Envia prévias e mensagem se passou 10 minutos sem resposta
+                    try:
+                        await send_previews(int(user_id))
+                        # Atualiza para não enviar repetidamente
+                        user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+                        save_data()
+                    except Exception as e:
+                        logging.error(f"[ERROR send_previews] {e}")
+        await asyncio.sleep(60)  # checa a cada minuto
+
 # === Handler principal ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -123,8 +159,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"🔥 Mensagem recebida: {text_raw}")
 
     if user_id not in user_data:
-        user_data[user_id] = {"messages": 0, "unlocked": False, "history": []}
+        user_data[user_id] = {
+            "messages": 0,
+            "unlocked": False,
+            "history": [],
+            "stickers_since_last": 0,
+            "last_interaction": datetime.utcnow().isoformat()
+        }
         save_data()
+
+    # Atualiza último contato sempre que o usuário mandar mensagem
+    user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
 
     # Detecta pedido de link VIP
     if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
@@ -142,13 +187,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open("images/preview1.jpg", "rb") as img1:
             await bot.send_photo(chat_id=update.effective_chat.id, photo=img1)
 
-        await asyncio.sleep(random.uniform(1, 2))
+        await asyncio.sleep(random.uniform(10, 12))
 
         # Segunda imagem
         with open("images/preview2.jpg", "rb") as img2:
             await bot.send_photo(chat_id=update.effective_chat.id, photo=img2)
 
-        await asyncio.sleep(random.uniform(1, 2))
+        await asyncio.sleep(random.uniform(10, 12))
         await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
         return
 
@@ -161,10 +206,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Limite de mensagens sem desbloquear
-    if user_data[user_id]["messages"] >= 35 and not user_data[user_id]["unlocked"]:
+    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
         await simulate_typing(update)
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
+
+    # Controle envio de figurinha a cada 10 mensagens
+    user_data[user_id]["stickers_since_last"] = user_data[user_id].get("stickers_since_last", 0) + 1
+    if user_data[user_id]["stickers_since_last"] >= 10:
+        # Enviar figurinha
+        sticker_file_id = "CAACAgIAAxkBAAECx1Fg5r...SeuFileIdAqui"  # Substitua pelo seu sticker válido
+        try:
+            await bot.send_sticker(chat_id=update.effective_chat.id, sticker=sticker_file_id)
+        except Exception as e:
+            logging.error(f"[ERROR send_sticker] {e}")
+        user_data[user_id]["stickers_since_last"] = 0  # Reset contador
 
     # Gera resposta IA
     reply = await generate_response(user_id, text_raw)
@@ -197,6 +253,8 @@ async def startup_event():
     await application.start()
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
+    # Inicia verificação de inatividade
+    asyncio.create_task(check_inactivity())
 
 @app.on_event("shutdown")
 async def shutdown_event():
