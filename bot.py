@@ -39,7 +39,7 @@ application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 # Loop global
 loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+asyncio.get_event_loop()
 
 # === Funções auxiliares ===
 async def delayed_reply(text: str, update: Update):
@@ -114,10 +114,11 @@ def home():
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    loop.create_task(application.process_update(update))
+    data = request.get_json(force=True)
+    print("📩 Recebi um update:", data)  # Debug
+    update = Update.de_json(data, bot)
+    loop.create_task(application.process_update(update))  # Agora funciona
     return "OK"
-    print("Recebi um update:", request.get_json(force=True))
 
 async def init_bot():
     await application.initialize()
@@ -131,5 +132,5 @@ def run_flask():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     threading.Thread(target=run_flask, daemon=True).start()
-    loop.run_until_complete(init_bot())
+    loop.run_until_complete(init_bot())  # Inicializa bot e define webhook
     loop.run_forever()
