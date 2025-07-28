@@ -68,40 +68,56 @@ async def generate_response(user_id: int, message: str):
 
 # === Handler principal ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text_raw = update.message.text or ""
-    text = text_raw.lower()
+    try:
+        user_id = update.effective_user.id
+        text_raw = update.message.text or ""
+        text = text_raw.lower()
 
-    # Inicializa dados do usuário
-    if user_id not in user_data:
-        user_data[user_id] = {"messages": 0, "unlocked": False, "history": [], "name": ""}
+        print(f"🔥 Mensagem recebida de {user_id}: {text_raw}")
 
-    # Primeira interação: pedir nome
-    if user_data[user_id]["name"] == "":
-        user_data[user_id]["name"] = text_raw.strip().capitalize()
-        await delayed_reply(f"Nice to meet you, {user_data[user_id]['name']} 💕 How are you feeling today?", update)
-        return
+        # Inicializa dados do usuário
+        if user_id not in user_data:
+            user_data[user_id] = {"messages": 0, "unlocked": False, "history": [], "name": ""}
 
-    # Detecta palavras-chave para desbloqueio
-    if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
-        await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
-        return
+        # Primeira interação: pedir nome
+        if user_data[user_id]["name"] == "":
+            user_data[user_id]["name"] = text_raw.strip().capitalize()
+            reply_text = f"Nice to meet you, {user_data[user_id]['name']} 💕 How are you feeling today?"
+            print(f"💬 Respondendo com: {reply_text}")
+            await update.message.reply_text(reply_text)
+            return
 
-    # Código de desbloqueio
-    if text.strip() == UNLOCK_CODE:
-        user_data[user_id]["unlocked"] = True
-        await delayed_reply("You're back, baby. Missed you 😘", update)
-        return
+        # Detecta palavras-chave para desbloqueio
+        if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
+            reply_text = f"🔥 Here’s your VIP access:\n{STRIPE_LINK}"
+            print(f"💬 Respondendo com: {reply_text}")
+            await update.message.reply_text(reply_text)
+            return
 
-    # Limite de mensagens (25) sem desbloqueio
-    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
-        await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
-        return
+        # Código de desbloqueio
+        if text.strip() == UNLOCK_CODE:
+            user_data[user_id]["unlocked"] = True
+            reply_text = "You're back, baby. Missed you 😘"
+            print(f"💬 Respondendo com: {reply_text}")
+            await update.message.reply_text(reply_text)
+            return
 
-    # Gerar resposta IA
-    reply = await generate_response(user_id, text_raw)
-    user_data[user_id]["messages"] += 1
-    await delayed_reply(reply, update)
+        # Limite de mensagens (25) sem desbloqueio
+        if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
+            reply_text = f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}"
+            print(f"💬 Respondendo com: {reply_text}")
+            await update.message.reply_text(reply_text)
+            return
+
+        # Gerar resposta IA
+        reply = await generate_response(user_id, text_raw)
+        user_data[user_id]["messages"] += 1
+        print(f"💬 Respondendo com: {reply}")
+        await update.message.reply_text(reply)
+
+    except Exception as e:
+        print(f"❌ Erro no handle_message: {e}")
+        await update.message.reply_text("Oops... Something went wrong, baby 😢")
 
 # === Handlers ===
 application.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("Hii baby 💕 What's your name?")))
@@ -115,9 +131,18 @@ def home():
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
-    print("📩 Recebi um update:", data)  # Debug
+    print("📩 Recebi um update:", data)
     update = Update.de_json(data, bot)
-    loop.create_task(application.process_update(update))  # Agora funciona
+
+    # Executa a task e loga erros
+    async def process():
+        try:
+            await application.process_update(update)
+            print("✅ Update processado com sucesso!")
+        except Exception as e:
+            print(f"❌ Erro ao processar update: {e}")
+
+    loop.create_task(process())
     return "OK"
 
 async def init_bot():
