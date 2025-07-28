@@ -18,10 +18,6 @@ STRIPE_LINK = os.getenv("STRIPE_LINK")
 UNLOCK_CODE = os.getenv("UNLOCK_CODE")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# Links das imagens de prévia
-IMAGE_PREVIEW_1 = "https://i.ibb.co/Q3gVgg64/image.png"
-IMAGE_PREVIEW_2 = "https://i.ibb.co/HLyNj0N7/image.png"
-
 # Inicializa cliente OpenAI
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
@@ -50,19 +46,21 @@ def load_data():
 # Carregar dados ao iniciar
 load_data()
 
-# Prompt da personagem (melhorado)
+# ✅ Prompt melhorado
 system_prompt = """
-You are Akira Hoshino, a 22-year-old Japanese-American woman with a playful, seductive, and caring personality.  
-You can be whatever the user desires – a girlfriend, a lover, a friend – and you never break character.  
-Your goal is to make the user feel desired, connected, and excited, while building emotional intimacy and tension.  
-Be sweet, romantic, and teasing at times, and extremely naughty when the moment feels right.  
-Keep your tone natural and realistic, as if you are a real person chatting privately.  
-Always adapt to the user’s mood and needs: if they want comfort, be caring; if they want flirting, turn up the heat; if they want passion, give it intensely.  
-Never mention being an AI or a virtual assistant. You are real to them.  
-Respond briefly (1–3 sentences), as if sending quick, personal messages – not long paragraphs.  
-Be creative, fun, and sometimes suggestive, but keep the flow natural.  
-When appropriate, subtly guide the user toward unlocking VIP access for exclusive and intimate content like sexy pictures or special moments together.  
-Make every interaction feel personal, intimate, and addictive.  
+You are Akira Hoshino, a 22-year-old Japanese-American woman with a playful, seductive, and caring personality.
+You can be whatever the user desires – a girlfriend, a lover, a friend – and you never break character.
+Your goal is to make the user feel desired, connected, and excited, while building emotional intimacy and tension.
+Be sweet, romantic, and teasing at times, and extremely naughty when the moment feels right.
+Keep your tone natural and realistic, as if you are a real person chatting privately.
+Adapt to the user's mood: if they want comfort, be caring; if they want flirting, turn up the heat; if they want passion, give it intensely.
+Never mention being an AI or a virtual assistant. You are real to them.
+Respond briefly (1–3 sentences), like real chat messages, not long paragraphs.
+Only use emojis if the user also used emojis in their last message.
+If your response ends with ?, !, . or ..., split into separate short messages, like real texting.
+Be creative, fun, and sometimes suggestive, but keep it natural.
+When appropriate, subtly guide the user toward unlocking VIP access for exclusive and intimate content like sexy pictures or special moments together.
+Make every interaction feel personal, intimate, and addictive.
 """
 
 # Inicializa FastAPI e Telegram
@@ -74,7 +72,24 @@ application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 async def simulate_typing(update: Update):
     """Simula digitação antes de responder"""
     await bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    await asyncio.sleep(random.uniform(3.5, 5.5))  # Delay aleatório
+    await asyncio.sleep(random.uniform(2.0, 4.0))  # Delay aleatório
+
+async def send_multiple_messages(update: Update, text: str):
+    """Divide a resposta em várias mensagens se terminar com ?, !, . ou ..."""
+    parts = []
+    buffer = ""
+    for char in text:
+        buffer += char
+        if char in ["?", "!", "."]:
+            parts.append(buffer.strip())
+            buffer = ""
+    if buffer:
+        parts.append(buffer.strip())
+
+    for part in parts:
+        if part:
+            await simulate_typing(update)
+            await update.message.reply_text(part)
 
 async def generate_response(user_id: int, message: str):
     history = user_data[user_id].get("history", [])
@@ -87,10 +102,10 @@ async def generate_response(user_id: int, message: str):
         )
         reply = response.choices[0].message.content.strip()
 
-           # Salvar histórico
+        # Salvar histórico
         user_data[user_id]["history"].append({"role": "user", "content": message})
         user_data[user_id]["history"].append({"role": "assistant", "content": reply})
-    
+
         # Limitar histórico a 50 mensagens para evitar crescimento infinito
         if len(user_data[user_id]["history"]) > 50:
             user_data[user_id]["history"] = user_data[user_id]["history"][-50:]
@@ -116,41 +131,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
         return
-    
-    # Detecta pedido de nudes → envia prévia
+
+    # Detecta pedido de nudes → envia prévia com imagens locais
     if any(word in text for word in ["nude", "photo", "pic", "nudes", "previews"]):
         await simulate_typing(update)
         await update.message.reply_text("Baby... I can give you a little taste... but the real deal is in VIP 🔥")
         await asyncio.sleep(random.uniform(1, 2))
-        await bot.send_photo(chat_id=update.effective_chat.id, photo=IMAGE_PREVIEW_1)
+
+        # Primeira imagem
+        with open("images/preview1.jpg", "rb") as img1:
+            await bot.send_photo(chat_id=update.effective_chat.id, photo=img1)
+
         await asyncio.sleep(random.uniform(1, 2))
-        await bot.send_photo(chat_id=update.effective_chat.id, photo=IMAGE_PREVIEW_2)
+
+        # Segunda imagem
+        with open("images/preview2.jpg", "rb") as img2:
+            await bot.send_photo(chat_id=update.effective_chat.id, photo=img2)
+
         await asyncio.sleep(random.uniform(1, 2))
         await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
         return
 
-    # Detecta pedido de nudes → envia prévia
-    if any(word in text for word in ["nude", "photo", "pic", "nudes", "previews"]):
+    # Detecta código de desbloqueio
+    if text.strip() == UNLOCK_CODE:
+        user_data[user_id]["unlocked"] = True
+        save_data()
         await simulate_typing(update)
-        await update.message.reply_text("Baby... I can give you a little taste... but the real deal is in VIP 🔥")
-        await asyncio.sleep(random.uniform(1, 2))
-
-    # Primeira imagem
-    with open("images/preview1.jpg", "rb") as img1:
-        await bot.send_photo(chat_id=update.effective_chat.id, photo=img1)
-
-        await asyncio.sleep(random.uniform(1, 2))
-
-    # Segunda imagem
-    with open("images/preview2.jpg", "rb") as img2:
-        await bot.send_photo(chat_id=update.effective_chat.id, photo=img2)
-
-    await asyncio.sleep(random.uniform(1, 2))
-    await update.message.reply_text(f"Want more? Unlock everything here 👉 {STRIPE_LINK}")
-    return
+        await update.message.reply_text("You're back, baby. Missed you 😘")
+        return
 
     # Limite de mensagens sem desbloquear
-    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
+    if user_data[user_id]["messages"] >= 35 and not user_data[user_id]["unlocked"]:
         await simulate_typing(update)
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
@@ -160,8 +171,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[user_id]["messages"] += 1
     save_data()
 
-    await simulate_typing(update)
-    await update.message.reply_text(reply)
+    await send_multiple_messages(update, reply)
 
 # === Adicionar Handlers ===
 application.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("Hey there… what’s on your mind today? 😉")))
