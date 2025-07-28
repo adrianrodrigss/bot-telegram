@@ -35,10 +35,11 @@ Avoid breaking character.
 # Inicializa Flask e Telegram
 flask_app = Flask(__name__)
 bot = Bot(token=TELEGRAM_TOKEN)
-application = ApplicationBuilder().token(TELEGRAM_TOKEN).updater(None).build()
+application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# Loop global para rodar no Render
-loop = asyncio.get_event_loop()
+# Loop global
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 # === Funções auxiliares ===
 async def delayed_reply(text: str, update: Update):
