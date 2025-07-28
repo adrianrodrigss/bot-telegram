@@ -81,7 +81,7 @@ async def send_multiple_messages(update: Update, text: str):
     buffer = ""
     for char in text:
         buffer += char
-        if char in ["?", "!", "."]:
+        if char in ["?", "!", "..."]:
             parts.append(buffer.strip())
             buffer = ""
     if buffer:
@@ -139,7 +139,7 @@ async def check_inactivity():
             unlocked = data.get("unlocked", False)
             if last and not unlocked:
                 last_time = datetime.fromisoformat(last)
-                if now - last_time > timedelta(minutes=10):
+                if now - last_time > timedelta(minutes=15):
                     # Envia prévias e mensagem se passou 10 minutos sem resposta
                     try:
                         await send_previews(int(user_id))
@@ -213,7 +213,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Controle envio de figurinha a cada 10 mensagens
     user_data[user_id]["stickers_since_last"] = user_data[user_id].get("stickers_since_last", 0) + 1
-    if user_data[user_id]["stickers_since_last"] >= 10:
+    if user_data[user_id]["stickers_since_last"] >= 25:
         # Enviar figurinha
         sticker_file_id = "CAACAgIAAxkBAAECx1Fg5r...SeuFileIdAqui"  # Substitua pelo seu sticker válido
         try:
