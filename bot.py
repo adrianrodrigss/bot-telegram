@@ -39,11 +39,11 @@ application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 # Loop global
 loop = asyncio.new_event_loop()
-asyncio.get_event_loop()
+asyncio.set_event_loop(loop)
 
 # === Funções auxiliares ===
 async def delayed_reply(text: str, update: Update):
-    await asyncio.sleep(random.randint(1, 3))  # Delay natural
+    await asyncio.sleep(random.randint(1, 3))
     await update.message.reply_text(text)
 
 async def generate_response(user_id: int, message: str):
@@ -57,7 +57,6 @@ async def generate_response(user_id: int, message: str):
         )
         reply = response.choices[0].message.content.strip()
 
-        # Salvar histórico
         user_data[user_id]["history"].append({"role": "user", "content": message})
         user_data[user_id]["history"].append({"role": "assistant", "content": reply})
 
@@ -72,51 +71,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         text_raw = update.message.text or ""
         text = text_raw.lower()
+        logging.info(f"🔥 Mensagem recebida de {user_id}: {text_raw}")
 
-        print(f"🔥 Mensagem recebida de {user_id}: {text_raw}")
-
-        # Inicializa dados do usuário
         if user_id not in user_data:
             user_data[user_id] = {"messages": 0, "unlocked": False, "history": [], "name": ""}
 
-        # Primeira interação: pedir nome
         if user_data[user_id]["name"] == "":
             user_data[user_id]["name"] = text_raw.strip().capitalize()
             reply_text = f"Nice to meet you, {user_data[user_id]['name']} 💕 How are you feeling today?"
-            print(f"💬 Respondendo com: {reply_text}")
             await update.message.reply_text(reply_text)
             return
 
-        # Detecta palavras-chave para desbloqueio
         if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
-            reply_text = f"🔥 Here’s your VIP access:\n{STRIPE_LINK}"
-            print(f"💬 Respondendo com: {reply_text}")
-            await update.message.reply_text(reply_text)
+            await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
             return
 
-        # Código de desbloqueio
         if text.strip() == UNLOCK_CODE:
             user_data[user_id]["unlocked"] = True
-            reply_text = "You're back, baby. Missed you 😘"
-            print(f"💬 Respondendo com: {reply_text}")
-            await update.message.reply_text(reply_text)
+            await update.message.reply_text("You're back, baby. Missed you 😘")
             return
 
-        # Limite de mensagens (25) sem desbloqueio
         if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
-            reply_text = f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}"
-            print(f"💬 Respondendo com: {reply_text}")
-            await update.message.reply_text(reply_text)
+            await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
             return
 
-        # Gerar resposta IA
         reply = await generate_response(user_id, text_raw)
         user_data[user_id]["messages"] += 1
-        print(f"💬 Respondendo com: {reply}")
         await update.message.reply_text(reply)
 
     except Exception as e:
-        print(f"❌ Erro no handle_message: {e}")
+        logging.error(f"❌ Erro no handle_message: {e}")
         await update.message.reply_text("Oops... Something went wrong, baby 😢")
 
 # === Handlers ===
@@ -131,25 +115,23 @@ def home():
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        update = Update.de_json(request.get_json(force=True), bot)
-        print(f"📩 Recebi um update: {request.get_json(force=True)}")
-        
-        # Agendar processamento no loop assíncrono
-        asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
+        update_json = request.get_json(force=True)
+        logging.info(f"📩 Recebi um update: {update_json}")
+        update = Update.de_json(update_json, bot)
+
+        future = asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
+        future.add_done_callback(lambda f: logging.info(f"✅ Update processado: {f.result()}"))
         
         return "OK"
     except Exception as e:
-        print(f"❌ Erro no webhook: {e}")
+        logging.error(f"❌ Erro no webhook: {e}")
         return "ERROR", 500
-
-    loop.create_task(process())
-    return "OK"
 
 async def init_bot():
     await application.initialize()
     await application.start()
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
-    logging.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+    logging.info(f"✅ Webhook set to {WEBHOOK_URL}/webhook")
 
 def run_flask():
     flask_app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
@@ -157,5 +139,5 @@ def run_flask():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     threading.Thread(target=run_flask, daemon=True).start()
-    loop.run_until_complete(init_bot())  # Inicializa bot e define webhook
+    loop.run_until_complete(init_bot())
     loop.run_forever()
