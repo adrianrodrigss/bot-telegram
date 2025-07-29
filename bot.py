@@ -218,7 +218,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.Document & ~filters.COMMAND, handle_message))
+application.add_handler(
+    MessageHandler(
+        (filters.TEXT | filters.PHOTO | filters.Document) & ~filters.COMMAND,
+        handle_message
+    )
+)
 
 
 @app.get("/")
