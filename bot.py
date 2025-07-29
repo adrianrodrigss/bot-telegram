@@ -26,12 +26,14 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 DATA_FILE = "user_data.json"
 user_data = {}
 
+
 def save_data():
     try:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(user_data, f, ensure_ascii=False)
     except Exception as e:
         logging.error(f"[ERROR SAVE DATA] {e}")
+
 
 def load_data():
     global user_data
@@ -41,6 +43,7 @@ def load_data():
                 user_data = json.load(f)
         except Exception as e:
             logging.error(f"[ERROR LOAD DATA] {e}")
+
 
 load_data()
 
@@ -64,9 +67,11 @@ app = FastAPI()
 bot = Bot(token=TELEGRAM_TOKEN)
 application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
+
 async def simulate_typing(update: Update):
     await bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     await asyncio.sleep(random.uniform(2.0, 4.0))
+
 
 async def send_multiple_messages(update: Update, text: str):
     parts = []
@@ -83,6 +88,7 @@ async def send_multiple_messages(update: Update, text: str):
         if part:
             await simulate_typing(update)
             await update.message.reply_text(part)
+
 
 async def generate_response(user_id: int, message: str):
     history = user_data[user_id].get("history", [])
@@ -104,6 +110,7 @@ async def generate_response(user_id: int, message: str):
     except Exception as e:
         logging.error(f"[ERROR GPT] {e}")
         return "Oops... Something went wrong baby 😢 Try again later."
+
 
 async def send_previews(user_id: int):
     chat_id = user_id
@@ -129,6 +136,7 @@ async def send_previews(user_id: int):
     ]
     await bot.send_message(chat_id=chat_id, text=random.choice(chamadas))
 
+
 async def check_inactivity():
     while True:
         now = datetime.utcnow()
@@ -146,10 +154,9 @@ async def check_inactivity():
                         logging.error(f"[ERROR send_previews] {e}")
         await asyncio.sleep(60)
 
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text_raw = update.message.text or ""
-    text = text_raw.lower()
 
     if user_id not in user_data:
         user_data[user_id] = {
@@ -157,19 +164,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "unlocked": False,
             "history": [],
             "bot_sent": 0,
-            "last_interaction": datetime.utcnow().isoformat()
+            "last_interaction": datetime.utcnow().isoformat(),
+            "sent_intro": False,
+            "sent_nudes": False
         }
         save_data()
 
+    if not user_data[user_id]["sent_intro"]:
+        audio_path = "audios/intro.ogg"
+        if os.path.exists(audio_path):
+            with open(audio_path, "rb") as voice:
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
+        user_data[user_id]["sent_intro"] = True
+
     user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+
+    if update.message.photo or update.message.document:
+        if not user_data[user_id].get("sent_nudes"):
+            await send_previews(user_id)
+            user_data[user_id]["sent_nudes"] = True
+            save_data()
+            return
+
+    text_raw = update.message.text or ""
+    text = text_raw.lower()
 
     if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
-        return
-
-    if any(word in text for word in ["nude", "photo", "pic", "nudes", "previews"]):
-        await send_previews(user_id)
         return
 
     if text.strip() == UNLOCK_CODE:
@@ -190,18 +212,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data()
     await send_multiple_messages(update, reply)
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await simulate_typing(update)
-    await update.message.reply_text("Hey there, handsome 😘")
-    await asyncio.sleep(2)
-    await update.message.reply_text("What's your name? 💕")
+    await handle_message(update, context)
+
 
 application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+application.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.Document & ~filters.COMMAND, handle_message))
+
 
 @app.get("/")
 async def home():
     return {"status": "Bot is running with FastAPI!"}
+
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -210,6 +233,7 @@ async def webhook(request: Request):
     await application.process_update(update)
     return {"status": "ok"}
 
+
 @app.on_event("startup")
 async def startup_event():
     await application.initialize()
@@ -217,6 +241,7 @@ async def startup_event():
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
     asyncio.create_task(check_inactivity())
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
