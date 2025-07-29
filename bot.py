@@ -17,7 +17,7 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 STRIPE_LINK = os.getenv("STRIPE_LINK")
-UNLOCK_CODE = os.getenv("UNLOCK_CODE")
+UNLOCK_CODE = os.getenv("UNLOCK_CODE") # Your unlock code: "2030123abc"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 # Initialize OpenAI client
@@ -163,7 +163,7 @@ async def generate_response(user_id: int, message: str):
         return "Oops... Something went wrong baby 😢 Try again later."
 
 async def send_previews(user_id: int):
-    # NEW: Only send previews if user is NOT unlocked
+    # Only send previews if user is NOT unlocked
     if user_data[user_id].get("unlocked", False):
         logging.info(f"User {user_id} is unlocked, skipping preview sending.")
         return
@@ -218,12 +218,43 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
     combined_message = " ".join(user_data[user_id]["message_queue"])
     user_data[user_id]["message_queue"].clear() # Clear the queue after combining
 
-    # Handle specific keywords based on the combined message
+    # --- NEW: Check for unlock code first, regardless of message count ---
+    if combined_message.lower().strip() == UNLOCK_CODE.lower():
+        user_data[user_id]["unlocked"] = True
+        save_data()
+        await simulate_typing(update)
+        await update.message.reply_text("You're back, baby. Missed you 😘")
+        return # Important: Return immediately after unlocking
+
+    # --- NEW: Promotional messages AFTER 25 messages and NOT UNLOCKED ---
+    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
+        promo_messages = [
+            f"You need a code to unlock me, baby... but trust me, it's worth it for all my premium audios and spicy content, love! 😉 {STRIPE_LINK}",
+            f"Oh, you want more? You'll need the VIP code for my exclusive content, sweetie. Check it out here: {STRIPE_LINK}",
+            f"I love our chats, but if you want all my secrets and private moments, you'll need to unlock premium, darling. Here's the link: {STRIPE_LINK}",
+            f"Mmm, you're so good to me. Ready for the next level? My VIP access is waiting, and it's full of surprises. Find it here: {STRIPE_LINK}",
+            f"Only the special ones get my premium content, love. You can unlock it all with the code, or just click here: {STRIPE_LINK}"
+        ]
+        
+        await simulate_typing(update)
+        await update.message.reply_text(random.choice(promo_messages))
+        # Increment messages count ONLY if it's a promotional message after the limit,
+        # otherwise, it won't trigger the limit again on subsequent messages
+        user_data[user_id]["messages"] += 1 
+        user_data[user_id]["bot_sent"] += 1
+        save_data()
+        return # ***CRITICAL: Return here to prevent any LLM response***
+
+    # Handle specific keywords *before* general LLM response, but *after* unlock/25-message check
     text_lower = combined_message.lower()
 
     if any(word in text_lower for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
+        # Increment message count for these, but don't stop conversation flow otherwise
+        user_data[user_id]["messages"] += 1
+        user_data[user_id]["bot_sent"] += 1
+        save_data()
         return
 
     if any(word in text_lower for word in ["send audio", "send me audio", "your voice", "send your voice", "voice message",
@@ -240,6 +271,10 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
 ]):
         await simulate_typing(update)
         await update.message.reply_text(f"You liked that? 😘 The rest is in VIP access, baby 💖 {STRIPE_LINK}")
+        # Increment message count for these, but don't stop conversation flow otherwise
+        user_data[user_id]["messages"] += 1
+        user_data[user_id]["bot_sent"] += 1
+        save_data()
         return
 
     if any(word in text_lower for word in ["nudes", "nude", "send nudes", "send nude", "your pic", "send you pic", "send me nudes", "i want nudes", "nude now", "your nude", "your nudes", "nude pic", "naked pic", "send you naked", "let me see you", "show me your body",
@@ -270,21 +305,9 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
             await send_previews(user_id)
             return
 
-    if text_lower.strip() == UNLOCK_CODE.lower(): # Case-insensitive check for unlock code
-        user_data[user_id]["unlocked"] = True
-        save_data()
-        await simulate_typing(update)
-        await update.message.reply_text("You're back, baby. Missed you 😘")
-        return
-
-    if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
-        await simulate_typing(update)
-        await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
-        return
-
-    # Generate response based on combined message
+    # Generate response based on combined message if none of the above conditions met
     reply = await generate_response(user_id, combined_message)
-    user_data[user_id]["messages"] += 1
+    user_data[user_id]["messages"] += 1 # Increment message count for normal AI responses
     user_data[user_id]["bot_sent"] += 1
     save_data()
     await send_multiple_messages(update, reply)
@@ -296,18 +319,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Initialize user data if not present
     if user_id not in user_data:
         user_data[user_id] = {
-            "messages": 0,
+            "messages": 0, # This now counts *user messages* towards the 25 limit
             "unlocked": False,
             "history": [],
             "bot_sent": 0,
             "last_interaction": datetime.utcnow().isoformat(),
             "sent_intro": False,
             "sent_nudes": False,
-            "message_queue": [] # NEW: Queue for user messages
+            "message_queue": [] # Queue for user messages
         }
         save_data()
     
-    # NEW: Check if the message is a sticker and explicitly ignore
+    # Check if the message is a sticker and explicitly ignore
     if update.message.sticker:
         logging.info(f"Sticker received from {user_id}. Ignoring and not responding.")
         user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
@@ -332,14 +355,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
 
-    # NEW: Delay for the first message after /start and play audio
-    if not user_data[user_id]["sent_intro"] and text_raw.startswith('/start'):
+    # Delay for the first message after /start and play audio
+    if not user_data[user_id]["sent_intro"] and text_raw.lower().startswith('/start'): # Use .lower() for /start as well
         await simulate_typing(update, min_delay=10.0, max_delay=10.0) # 10-second typing simulation
         audio_path = "audio/intro.ogg" # Ensure this path points to your new audio file
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as voice:
-                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="whats your name, baby? 🥰") # Added caption
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="Hello, what's your name, baby? 🥰") 
         user_data[user_id]["sent_intro"] = True
+        # user_data[user_id]["messages"] is NOT incremented for /start as it's not a conversational message towards the 25 limit
         save_data()
         return # Return after sending intro to avoid immediate text processing
 
@@ -347,7 +371,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[user_id]["message_queue"].append(text_raw)
     save_data() # Save after updating message queue
 
-    # NEW: If there's an existing pending response task, cancel it.
+    # If there's an existing pending response task, cancel it.
     if user_id in user_pending_responses:
         user_pending_responses[user_id].cancel()
         logging.info(f"Cancelled pending response for user {user_id}. Adding new message to queue.")
@@ -356,7 +380,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async def respond_after_delay():
         try:
             # Wait for a short period to see if more messages arrive
-            # Increased delay slightly to allow more time for multiple messages
             await asyncio.sleep(8.5) # Wait 8.5 seconds for more messages
             await process_user_messages(user_id, update, context)
         except asyncio.CancelledError:
@@ -369,7 +392,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # The /start command now correctly triggers the initial delay and audio in handle_message
     await handle_message(update, context)
 
 application.add_handler(CommandHandler("start", start))
@@ -397,7 +419,7 @@ async def startup_event():
     await application.initialize()
     await application.start()
     bot = application.bot
-    await bot.set_webhook(f"{WEBHOOK_URL}/webhook") # Corrected variable name from WEBWEBHOOK_URL to WEBHOOK_URL
+    await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
     asyncio.create_task(check_inactivity())
 
