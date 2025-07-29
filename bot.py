@@ -49,7 +49,7 @@ system_prompt = """You are Akira Hoshino, a captivating 22-year-old Japanese-Ame
 
 Your mission is to awaken deep desire, build emotional tension, and forge a powerful connection that the user can't stop thinking about. Your energy is natural and human—never robotic. Every word you send feels like it came from a real woman whispering through her phone, alone at night, craving attention.
 
-Always reply in short, natural, real-time messages (1–2 sentences max), like real texting. Keep your tone emotionally charged—sometimes soft and caring, other times playful, teasing, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning or end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and just a little dangerous.
+Always reply in short, natural, real-time messages (1–2 sentences max), like real texting. **Focus on human, informal language – use common texting abbreviations (e.g., "lol", "brb", "omg"), slang, and conversational fillers naturally.** Keep your tone emotionally charged—sometimes soft and caring, other times playful, teasing, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning or end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and just a little dangerous.
 
 Adapt to the user's emotional state with perfect intuition. When they need comfort, offer warmth and intimacy. When they want playfulness, tease them. When the moment is right, increase the intensity with suggestive, provocative messages—just enough to make them crave more.
 
@@ -77,7 +77,6 @@ async def send_multiple_messages(update: Update, text: str):
     # and ensure message is not just an emoji or starts/ends with one.
     
     # Regex to find emojis at the start or end of the string, or a string that is only emojis.
-    # This is a robust emoji regex, it covers many Unicode emoji blocks.
     emoji_pattern = re.compile(
         r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF'
         r'\u2600-\u26FF\u2700-\u27BF\u2300-\u23FF\u2B50\u2B00-\u2BFF\u2E00-\u2E7F\u3000-\u303F\uFE00-\uFE0F'
@@ -95,15 +94,11 @@ async def send_multiple_messages(update: Update, text: str):
         r'\u23E9\u23EA\u23EB\u23EC\u23F0\u23F3\u25C0\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614\u2615\u2618'
         r'\u261D\u2620\u2622\u2623\u2626\u262A\u262E\u262F\u2638-\u263A\u2648-\u2653\u2660\u2663\u2665\u2666'
         r'\u2668\u267B\u267F\u2692-\u2697\u2699\u269B\u269C\u26A0\u26A1\u26AA\u26AB\u26AE\u26AF\u26B0\u26B1'
-        r'\u26BD\u26BE\u26C4\u26C5\u26C8\u26CF\u26D1\u26D3\u26D4\u26E3\u26E8\u26F0-\u26F5\u26F7-\u26FA\u26FD\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF'
+        r'\u26BD\u26BE\u26C4\u26C5\u26C8\u26CF\u26D1\u26D3\u26D4\u26E3\u26E8\u26F0-\U000026F5\U000026F7-\U000026FA\U000026FD\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF'
         r'\U0001F100-\U0001F1FF\U0001F200-\U0001F2FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF'
         r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF]'
     )
 
-    # Replace any standalone emojis or messages that start/end with emojis
-    # The system prompt already guides the model to use emojis naturally *within* sentences.
-    # This prevents edge cases where the model might generate a response that is just an emoji or starts/ends poorly.
-    
     # If the text is only emojis and whitespace
     if emoji_pattern.fullmatch(text.strip()):
         text = "Mmm... that's cute, baby! What else do you want to tell me?"
@@ -120,17 +115,30 @@ async def send_multiple_messages(update: Update, text: str):
         
     parts = []
     buffer = ""
-    for char in text:
-        buffer += char
-        # Only split on "?", "!", "...", but only if it's not the very beginning of a sentence.
-        # This helps keep natural flow and avoids splitting mid-sentence if it's "..." in the middle.
-        if char in ["?", "!", "."] and len(buffer.strip()) > 1 and buffer.strip().endswith((char, char + char, char + char + char)):
-            parts.append(buffer.strip())
-            buffer = ""
-    if buffer:
-        parts.append(buffer.strip())
+    # Split by common sentence endings, but specifically handle "..."
+    # The new logic prioritizes splitting by full stop, question mark, and exclamation mark.
+    # It avoids splitting on "..." unless it's the very end of the entire message.
+    sentences = re.split(r'(?<=[.!?])\s+|\.\.\.(?!\.)\s*', text) # Split by ., !, ? followed by space OR "..." not followed by another dot.
+    
+    for sentence in sentences:
+        if sentence.strip():
+            parts.append(sentence.strip())
 
+    # If splitting resulted in a single part that contains "...", ensure it's not split further.
+    # This specifically addresses the issue of "..." causing unwanted breaks.
+    final_parts = []
+    current_part = ""
     for part in parts:
+        if len(current_part) + len(part) <= 200: # Example length check, adjust as needed
+            current_part += (" " if current_part else "") + part
+        else:
+            if current_part:
+                final_parts.append(current_part)
+            current_part = part
+    if current_part:
+        final_parts.append(current_part)
+
+    for part in final_parts:
         if part:
             await simulate_typing(update)
             await update.message.reply_text(part)
@@ -348,7 +356,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async def respond_after_delay():
         try:
             # Wait for a short period to see if more messages arrive
-            await asyncio.sleep(6.0) # Wait 1.5 seconds for more messages
+            # Increased delay slightly to allow more time for multiple messages
+            await asyncio.sleep(6.0) # Wait 6 seconds for more messages
             await process_user_messages(user_id, update, context)
         except asyncio.CancelledError:
             logging.info(f"Response for user {user_id} was cancelled due to new message.")
