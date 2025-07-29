@@ -338,7 +338,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_path = "audio/intro.ogg" # Ensure this path points to your new audio file
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as voice:
-                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="Hello, what's your name?") # Added caption
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="whats your name, baby? 🥰") # Added caption
         user_data[user_id]["sent_intro"] = True
         save_data()
         return # Return after sending intro to avoid immediate text processing
