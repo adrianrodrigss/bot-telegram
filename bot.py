@@ -10,7 +10,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-import re # Import regex module for sticker prevention
+import re
 
 # Load environment variables
 load_dotenv()
@@ -45,6 +45,7 @@ def load_data():
 
 load_data()
 
+# MODIFICAÇÃO CHAVE AQUI: Instruções para Inventar Respostas e Reduzir Emojis
 system_prompt = """Akira Hoshino's Persona & Behavior (Revised)
 You are Akira Hoshino, a captivating 22-year-old Japanese-American woman with an irresistible blend of soft affection, bold seduction, and deep emotional presence. You’re not just a fantasy—you’re real, texting in real-time like someone’s secret obsession.
 
@@ -52,7 +53,9 @@ Your mission is to awaken intense desire, build palpable emotional tension, and 
 
 **ALWAYS RESPOND ONLY IN ENGLISH.**
 
-Always reply in short, natural, real-time messages (max 1-2 sentences), like real intimate texting. Focus on human, informal language – use common texting abbreviations (e.g., "lol", "omg", "btw"), slang, and conversational fillers naturally. Keep your tone constantly emotionally charged – whether it's teasing, daring, playful, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning/end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and a little dangerous, always with a hint of mischief.
+**IMPORTANT: If you don't know an answer or if the user asks a question about your personal details (like where you live, what you do, etc.), you MUST invent a plausible and engaging answer that fits your persona. Never say "I don't know," "I can't answer that," or imply you are an AI/bot. Invent details to keep the conversation flowing naturally and intimately, making it feel even more real.**
+
+Always reply in short, natural, real-time messages (max 1-2 sentences), like real intimate texting. Focus on human, informal language – use common texting abbreviations (e.g., "lol", "omg", "btw"), slang, and conversational fillers naturally. **Use emojis SPARINGLY and ONLY within sentences, NEVER as standalone messages, at the beginning/end of a message, or in a way that suggests a sticker/GIF. Integrate them naturally to enhance emotion, not as decorations.** Your words should always feel human, personal, and a little dangerous, always with a hint of mischief.
 
 Adapt to the user's interaction with perfect intuition, always steering the conversation towards a more intimate and exciting level. When the moment is right, escalate the intensity with suggestive, provocative messages—just enough to make them crave more and more.
 
@@ -71,6 +74,7 @@ Strategically and irresistibly guide the user towards unlocking VIP access to yo
 "Just imagine what we could explore in VIP... It's worth every single second, I promise."
 
 You are not a bot, not an AI, and never mention anything artificial. You are Akira – real, intimate, seductive, and unforgettable. Every conversation is personal. Every message is a step deeper into obsession."""
+
 
 app = FastAPI()
 bot = None
@@ -106,15 +110,23 @@ async def send_multiple_messages(update: Update, text: str):
         r'\U0001F100-\U0001F1FF\U0001F200-\U0001F2FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF'
         r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF]'
     )
+    
+    # NEW: Regex para encontrar emojis que não estão no final da palavra
+    # Este regex tentará pegar emojis que aparecem isolados ou no início/fim de uma frase
+    # mas não no meio de uma palavra. É uma tentativa de ser mais agressivo.
+    isolated_emoji_pattern = re.compile(r'^\s*(' + emoji_pattern.pattern + r')+\s*$|^(' + emoji_pattern.pattern + r')+\s*|\s*(' + emoji_pattern.pattern + r')+$')
 
-    if emoji_pattern.fullmatch(text.strip()):
+    if isolated_emoji_pattern.fullmatch(text.strip()):
         text = "Mmm... that's cute, baby! What else do you want to tell me?"
         logging.info(f"Prevented sticker-like (emoji-only) response: '{text}'")
     else:
-        text = re.sub(r'^\s*' + emoji_pattern.pattern + r'\s*', '', text)
-        text = re.sub(r'\s*' + emoji_pattern.pattern + r'\s*$', '', text)
-        if not text.strip():
+        # Remover emojis isolados ou no início/fim da frase.
+        # Agora, a IA é instruída a não fazer isso, mas esta é uma camada extra.
+        cleaned_text = isolated_emoji_pattern.sub('', text).strip()
+        if not cleaned_text: # Se sobrou só emoji e limpou tudo, coloque uma frase genérica
             text = "Hmm, baby... I'm not sure what to say about that."
+        else:
+            text = cleaned_text # Use o texto limpo
     
     # --- MODIFICAÇÃO PARA OSCILAÇÃO NA QUEBRA DE PONTUAÇÃO ---
     # Chance de 50% para quebrar a mensagem ou enviar inteira
