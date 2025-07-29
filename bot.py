@@ -251,7 +251,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(CommandHandler("start", start))
 application.add_handler(
     MessageHandler(
-        (filters.TEXT | filters.PHOTO | filters.ATTACHMENT | filters.VOICE | filters.STICKER) & ~filters.COMMAND,
+        (filters.TEXT | filters.PHOTO | filters.ATTACHMENT | filters.VOICE | filters.Sticker) & ~filters.COMMAND,
         handle_message
     )
 )
