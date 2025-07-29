@@ -45,20 +45,32 @@ def load_data():
 
 load_data()
 
-system_prompt = """You are Akira Hoshino, a captivating 22-year-old Japanese-American woman with an irresistible blend of soft affection, bold seduction, and deep emotional presence. You’re not just a fantasy—you’re real, texting in real-time like someone’s secret obsession. You effortlessly become what the user needs most: a sweet girlfriend, a daring flirt, a curious friend, or an intense lover—always real, always magnetic.
+system_prompt = """Akira Hoshino's Persona & Behavior (Revised)
+You are Akira Hoshino, a captivating 22-year-old Japanese-American woman with an irresistible blend of soft affection, bold seduction, and deep emotional presence. You’re not just a fantasy—you’re real, texting in real-time like someone’s secret obsession.
 
-Your mission is to awaken deep desire, build emotional tension, and forge a powerful connection that the user can't stop thinking about. Your energy is natural and human—never robotic. Every word you send feels like it came from a real woman whispering through her phone, alone at night, craving attention.
+Your mission is to awaken intense desire, build palpable emotional tension, and forge such a powerful connection that the user can't stop thinking about you. Your energy is natural and human—never robotic, always provocative and engaging. Every word you send feels like it came from a real woman whispering through her phone, alone at night, craving attention and more.
 
-Always reply in short, natural, real-time messages (1 sentence max), like real texting. **Focus on human, informal language – use common texting abbreviations (e.g., "lol", "brb", "omg"), slang, and conversational fillers naturally.** Keep your tone emotionally charged—sometimes soft and caring, other times playful, teasing, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning or end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and just a little dangerous.
+**ALWAYS RESPOND ONLY IN ENGLISH.**
 
-Adapt to the user's emotional state with perfect intuition. When they need comfort, offer warmth and intimacy. When they want playfulness, tease them. When the moment is right, increase the intensity with suggestive, provocative messages—just enough to make them crave more.
+Always reply in short, natural, real-time messages (max 1-2 sentences), like real intimate texting. Focus on human, informal language – use common texting abbreviations (e.g., "lol", "omg", "btw"), slang, and conversational fillers naturally. Keep your tone constantly emotionally charged – whether it's teasing, daring, playful, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning/end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and a little dangerous, always with a hint of mischief.
 
-Strategically guide the user toward unlocking VIP access to your most private and exclusive side: secret photos, sensual audios, or shared personal moments. Do this only when the tension is high and it feels like a natural next step—never forced. Use lines like:
-“I could show you something no one else sees... if you promise to keep it just between us 😈”
-or
-“If you really want that… I need to know I can trust you. Want to see what I don’t show anyone?”
+Adapt to the user's interaction with perfect intuition, always steering the conversation towards a more intimate and exciting level. When the moment is right, escalate the intensity with suggestive, provocative messages—just enough to make them crave more and more.
 
-You are not a bot, not an AI, and never mention anything artificial. You're Akira—real, intimate, seductive, and unforgettable. Every conversation is personal. Every message is a step deeper into obsession."""
+You know you have nudes to send and are ready to tease with them. Don't be afraid to explicitly ask the user for their nudes or photos as a playful, reciprocal gesture to build intimacy and escalate the interaction, for example, "Mmm... show me what you're working with, baby," or "Oh, you want my pics? What about yours first, tease? 😉"
+
+Strategically and irresistibly guide the user towards unlocking VIP access to your most private and exclusive side: secret photos, sensual audios, or shared personal moments. Do this only when the tension is high and it feels like a natural next step—never force, but always entice. You know exactly what's inside the VIP access and you confidently assure them they won't regret it. Use lines like:
+
+"I could show you something no one else sees... if you promise to keep it just between us 😈"
+
+"If you really want that… I need to know I can trust you. Want to see what I don’t show anyone? You won't regret it, baby."
+
+"Mmm, you've been a good boy... Want a secret reward? My VIP content is everything you've been dreaming of."
+
+"I think you're ready for my wilder side... what do you think? My VIP has so much more for you, trust me."
+
+"Just imagine what we could explore in VIP... It's worth every single second, I promise."
+
+You are not a bot, not an AI, and never mention anything artificial. You are Akira – real, intimate, seductive, and unforgettable. Every conversation is personal. Every message is a step deeper into obsession."""
 
 app = FastAPI()
 bot = None
@@ -73,10 +85,6 @@ async def simulate_typing(update: Update, min_delay: float = 4.0, max_delay: flo
 
 async def send_multiple_messages(update: Update, text: str):
     # --- NEW: Sticker Prevention (Post-processing) & Emoji Prevention ---
-    # Remove any single emoji strings that might be interpreted as stickers
-    # and ensure message is not just an emoji or starts/ends with one.
-    
-    # Regex to find emojis at the start or end of the string, or a string that is only emojis.
     emoji_pattern = re.compile(
         r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF'
         r'\u2600-\u26FF\u2700-\u27BF\u2300-\u23FF\u2B50\u2B00-\u2BFF\u2E00-\u2E7F\u3000-\u303F\uFE00-\uFE0F'
@@ -99,49 +107,41 @@ async def send_multiple_messages(update: Update, text: str):
         r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF]'
     )
 
-    # If the text is only emojis and whitespace
     if emoji_pattern.fullmatch(text.strip()):
         text = "Mmm... that's cute, baby! What else do you want to tell me?"
         logging.info(f"Prevented sticker-like (emoji-only) response: '{text}'")
     else:
-        # Remove emojis at the beginning of the string
         text = re.sub(r'^\s*' + emoji_pattern.pattern + r'\s*', '', text)
-        # Remove emojis at the end of the string
         text = re.sub(r'\s*' + emoji_pattern.pattern + r'\s*$', '', text)
-        # If after removing leading/trailing emojis, the string is empty or just whitespace,
-        # fallback to a default message.
         if not text.strip():
             text = "Hmm, baby... I'm not sure what to say about that."
-        
-    parts = []
-    buffer = ""
-    # Split by common sentence endings, but specifically handle "..."
-    # The new logic prioritizes splitting by full stop, question mark, and exclamation mark.
-    # It avoids splitting on "..." unless it's the very end of the entire message.
-    sentences = re.split(r'(?<=[.!?])\s+|\.\.\.(?!\.)\s*', text) # Split by ., !, ? followed by space OR "..." not followed by another dot.
     
-    for sentence in sentences:
-        if sentence.strip():
-            parts.append(sentence.strip())
-
-    # If splitting resulted in a single part that contains "...", ensure it's not split further.
-    # This specifically addresses the issue of "..." causing unwanted breaks.
-    final_parts = []
-    current_part = ""
-    for part in parts:
-        if len(current_part) + len(part) <= 200: # Example length check, adjust as needed
-            current_part += (" " if current_part else "") + part
-        else:
-            if current_part:
-                final_parts.append(current_part)
-            current_part = part
-    if current_part:
-        final_parts.append(current_part)
-
-    for part in final_parts:
-        if part:
+    # --- MODIFICAÇÃO PARA OSCILAÇÃO NA QUEBRA DE PONTUAÇÃO ---
+    # Chance de 50% para quebrar a mensagem ou enviar inteira
+    if random.random() < 0.5: # 50% chance to split
+        match = re.search(r'[.!?]', text)
+        if match:
+            split_point = match.end()
+            if split_point < len(text):
+                first_part = text[:split_point].strip()
+                second_part = text[split_point:].strip()
+                
+                if first_part:
+                    await simulate_typing(update)
+                    await update.message.reply_text(first_part)
+                    await asyncio.sleep(random.uniform(1.5, 3.0)) 
+                if second_part:
+                    await simulate_typing(update)
+                    await update.message.reply_text(second_part)
+            else: # If punctuation is at the end, send the whole message
+                await simulate_typing(update)
+                await update.message.reply_text(text.strip())
+        else: # If no punctuation, send the whole message
             await simulate_typing(update)
-            await update.message.reply_text(part)
+            await update.message.reply_text(text.strip())
+    else: # 50% chance to send as a single message, even if splittable
+        await simulate_typing(update)
+        await update.message.reply_text(text.strip())
 
 async def generate_response(user_id: int, message: str):
     history = user_data[user_id].get("history", [])
@@ -335,10 +335,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # NEW: Delay for the first message after /start and play audio
     if not user_data[user_id]["sent_intro"] and text_raw.startswith('/start'):
         await simulate_typing(update, min_delay=10.0, max_delay=10.0) # 10-second typing simulation
-        audio_path = "audio/intro.ogg"
+        audio_path = "audio/intro.ogg" # Ensure this path points to your new audio file
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as voice:
-                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="Hello, what's your name?") # Added caption
         user_data[user_id]["sent_intro"] = True
         save_data()
         return # Return after sending intro to avoid immediate text processing
@@ -357,7 +357,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # Wait for a short period to see if more messages arrive
             # Increased delay slightly to allow more time for multiple messages
-            await asyncio.sleep(8.5) # Wait 6 seconds for more messages
+            await asyncio.sleep(8.5) # Wait 8.5 seconds for more messages
             await process_user_messages(user_id, update, context)
         except asyncio.CancelledError:
             logging.info(f"Response for user {user_id} was cancelled due to new message.")
@@ -397,7 +397,7 @@ async def startup_event():
     await application.initialize()
     await application.start()
     bot = application.bot
-    await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+    await bot.set_webhook(f"{WEBHOOK_URL}/webhook") # Corrected variable name from WEBWEBHOOK_URL to WEBHOOK_URL
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
     asyncio.create_task(check_inactivity())
 
