@@ -58,15 +58,17 @@ If your response ends with ?, !, . or ..., split into separate short messages, l
 Be creative, fun, and sometimes suggestive, but keep it natural.
 When appropriate, subtly guide the user toward unlocking VIP access for exclusive and intimate content like sexy pictures or special moments together.
 Make every interaction feel personal, intimate, and addictive.
+Crucially, **NEVER SEND ANY STICKERS**. Only send text messages, photos (when explicitly coded for previews), or voice notes (when explicitly coded).
+After responding to a message, always try to ask a question or make a suggestive comment to keep the conversation flowing and prevent it from dying. Be proactive in maintaining engagement.
 """
 
 app = FastAPI()
 bot = None
 application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-async def simulate_typing(update: Update):
+async def simulate_typing(update: Update, min_delay: float = 4.0, max_delay: float = 7.0):
     await bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    await asyncio.sleep(random.uniform(4.0, 7.0))
+    await asyncio.sleep(random.uniform(min_delay, max_delay))
 
 async def send_multiple_messages(update: Update, text: str):
     parts = []
@@ -144,6 +146,7 @@ async def check_inactivity():
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
+    # Initialize user data if not present
     if user_id not in user_data:
         user_data[user_id] = {
             "messages": 0,
@@ -155,6 +158,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "sent_nudes": False
         }
         save_data()
+    
+    # Check if the message is a sticker and ignore it
+    if update.message.sticker:
+        # logging.info(f"Sticker received from {user_id}. Ignoring.")
+        return
+
+    # Delay for the first message after /start (before sending audio)
+    if not user_data[user_id]["sent_intro"] and update.message.text and update.message.text.startswith('/start'):
+        # This delay happens before sending the intro audio
+        await asyncio.sleep(10) # 10-second delay for the first message after /start
 
     if not user_data[user_id]["sent_intro"]:
         audio_path = "audio/intro.ogg"
@@ -162,12 +175,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             with open(audio_path, "rb") as voice:
                 await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
         user_data[user_id]["sent_intro"] = True
+        save_data() # Save after sending intro
+        return # Important: Return after sending intro to avoid processing as a regular message immediately
 
     user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
 
-    if update.message.sticker:
-        return  # ignore stickers
-
+    # Handle incoming photos/documents
     if update.message.photo or update.message.document:
         if not user_data[user_id].get("sent_nudes"):
             await send_previews(user_id)
@@ -178,41 +191,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_raw = update.message.text or ""
     text = text_raw.lower()
 
+    # Handle specific keywords
     if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
         return
 
-    if any(word in text for word in ["send audio", "send me audio", "your voice", "send your voice", "voice message",  
-"can you talk?", "say something", "talk to me", "i want your voice",  
-"send voice", "send voice message", "voice please", "audio please",  
-"i want to hear you", "let me hear you", "say hi", "say my name",  
-"talk dirty", "sexy voice", "moan for me", "moaning", "make a sound",  
-"send me your moan", "send a sexy audio", "talk to me baby", "talk sexy",  
-"can i hear you?", "can you moan?", "your audio", "voice clip",  
-"send a voice clip", "i want a voice clip", "talk to me with voice",  
-"say something hot", "say something sexy", "can you say that again?",  
-"say it with voice", "audio now", "play audio", "send voice now",  
+    if any(word in text for word in ["send audio", "send me audio", "your voice", "send your voice", "voice message",
+"can you talk?", "say something", "talk to me", "i want your voice",
+"send voice", "send voice message", "voice please", "audio please",
+"i want to hear you", "let me hear you", "say hi", "say my name",
+"talk dirty", "sexy voice", "moan for me", "moaning", "make a sound",
+"send me your moan", "send a sexy audio", "talk to me baby", "talk sexy",
+"can i hear you?", "can you moan?", "your audio", "voice clip",
+"send a voice clip", "i want a voice clip", "talk to me with voice",
+"say something hot", "say something sexy", "can you say that again?",
+"say it with voice", "audio now", "play audio", "send voice now",
 "can you speak?", "speak to me", "speak baby", "audio sexy", "say it in audio"
 ]):
         await simulate_typing(update)
         await update.message.reply_text(f"You liked that? 😘 The rest is in VIP access, baby 💖 {STRIPE_LINK}")
         return
 
-    if any(word in text for word in ["nudes", "nude", "send nudes", "send nude", "your pic", "send you pic", "send me nudes", "i want nudes", "nude now", "your nude", "your nudes", "nude pic", "naked pic", "send you naked", "let me see you", "show me your body",  
-"show me everything", "show me more", "send sexy pic", "send hot pic",  
-"send me something hot", "can i see you?", "i want to see you", "show me something",  
-"show me naked", "show boobs", "show me boobs", "let me see your nudes",  
-"more nudes", "any nude?", "do you have nudes?", "show tits", "boobs pic",  
-"send me boobs", "hot content", "private photo", "send private", "show private",  
-"can you send something?", "send lewd", "lewd pic", "show lewd",  
-"send spicy", "spicy pic", "spicy photo", "can i see more?", "send adult",  
-"nsfw pic", "send nsfw", "nude please", "pic please", "any hot pic?",  
-"give me a nude", "give nudes", "one nude", "show me one nude",  
-"you have onlyfans?", "send onlyfans", "send something sexy", "more sexy",  
-"get naked", "go nude", "remove clothes", "take off your clothes",  
-"strip for me", "i want to see you naked", "send body", "show me body",  
-"i want sexy pic", "can you be naked?", "show me your nudes",  
+    if any(word in text for word in ["nudes", "nude", "send nudes", "send nude", "your pic", "send you pic", "send me nudes", "i want nudes", "nude now", "your nude", "your nudes", "nude pic", "naked pic", "send you naked", "let me see you", "show me your body",
+"show me everything", "show me more", "send sexy pic", "send hot pic",
+"send me something hot", "can i see you?", "i want to see you", "show me something",
+"show me naked", "show boobs", "show me boobs", "let me see your nudes",
+"more nudes", "any nude?", "do you have nudes?", "show tits", "boobs pic",
+"send me boobs", "hot content", "private photo", "send private", "show private",
+"can you send something?", "send lewd", "lewd pic", "show lewd",
+"send spicy", "spicy pic", "spicy photo", "can i see more?", "send adult",
+"nsfw pic", "send nsfw", "nude please", "pic please", "any hot pic?",
+"give me a nude", "give nudes", "one nude", "show me one nude",
+"you have onlyfans?", "send onlyfans", "send something sexy", "more sexy",
+"get naked", "go nude", "remove clothes", "take off your clothes",
+"strip for me", "i want to see you naked", "send body", "show me body",
+"i want sexy pic", "can you be naked?", "show me your nudes",
 "let me see your pic", "can i see nude pic?", "nude photo", "sexy photo"
 ]):
         if not user_data[user_id].get("sent_nudes"):
@@ -239,6 +253,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
 
+    # Generate response
     reply = await generate_response(user_id, text_raw)
     user_data[user_id]["messages"] += 1
     user_data[user_id]["bot_sent"] += 1
@@ -246,6 +261,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_multiple_messages(update, reply)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # The /start command also goes through handle_message, which now has the delay logic
     await handle_message(update, context)
 
 application.add_handler(CommandHandler("start", start))
