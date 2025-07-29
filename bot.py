@@ -357,7 +357,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # Wait for a short period to see if more messages arrive
             # Increased delay slightly to allow more time for multiple messages
-            await asyncio.sleep(6.0) # Wait 6 seconds for more messages
+            await asyncio.sleep(8.5) # Wait 6 seconds for more messages
             await process_user_messages(user_id, update, context)
         except asyncio.CancelledError:
             logging.info(f"Response for user {user_id} was cancelled due to new message.")
