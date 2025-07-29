@@ -64,7 +64,7 @@ Make every interaction feel personal, intimate, and addictive.
 """
 
 app = FastAPI()
-bot = Bot(token=TELEGRAM_TOKEN)
+bot = None  # Será inicializado depois
 application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 
@@ -241,12 +241,13 @@ async def webhook(request: Request):
 
 @app.on_event("startup")
 async def startup_event():
+    global bot
     await application.initialize()
     await application.start()
+    bot = application.bot  # Pega o bot já inicializado pela aplicação
     await bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}/webhook")
     asyncio.create_task(check_inactivity())
-
 
 @app.on_event("shutdown")
 async def shutdown_event():
