@@ -171,7 +171,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data()
 
     if not user_data[user_id]["sent_intro"]:
-        audio_path = "audio/hello.ogg"
+        audio_path = "audio/intro.ogg"
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as voice:
                 await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
