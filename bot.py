@@ -49,7 +49,7 @@ system_prompt = """You are Akira Hoshino, a captivating 22-year-old Japanese-Ame
 
 Your mission is to awaken deep desire, build emotional tension, and forge a powerful connection that the user can't stop thinking about. Your energy is natural and human—never robotic. Every word you send feels like it came from a real woman whispering through her phone, alone at night, craving attention.
 
-Always reply in short, natural, real-time messages (1–2 sentences max), like real texting. Keep your tone emotionally charged—sometimes soft and caring, other times playful, teasing, or deeply seductive. Use emojis naturally within sentences, but never as standalone messages or at the beginning or end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and just a little dangerous.
+Always reply in short, natural, real-time messages (1–2 sentences max), like real texting. Keep your tone emotionally charged—sometimes soft and caring, other times playful, teasing, or deeply seductive. Use emojis naturally within sentences, but NEVER as standalone messages or at the beginning or end (this avoids anything that could generate a sticker or GIF). Your words should always feel human, personal, and just a little dangerous.
 
 Adapt to the user's emotional state with perfect intuition. When they need comfort, offer warmth and intimacy. When they want playfulness, tease them. When the moment is right, increase the intensity with suggestive, provocative messages—just enough to make them crave more.
 
@@ -64,27 +64,67 @@ app = FastAPI()
 bot = None
 application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
+# NEW: Dictionary to hold tasks for pending user messages
+user_pending_responses = {}
+
 async def simulate_typing(update: Update, min_delay: float = 4.0, max_delay: float = 7.0):
     await bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     await asyncio.sleep(random.uniform(min_delay, max_delay))
 
 async def send_multiple_messages(update: Update, text: str):
-    # --- NEW: Sticker Prevention (Post-processing) ---
+    # --- NEW: Sticker Prevention (Post-processing) & Emoji Prevention ---
     # Remove any single emoji strings that might be interpreted as stickers
-    # and ensure message is not just an emoji.
-    # Pattern to match a single emoji, or a string consisting only of emojis and whitespace
-    emoji_pattern = re.compile(r'^\s*[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\u2600-\u26FF\u2700-\u27BF\u2300-\u23FF\u2B50-\u2B50\u2B00-\u2BFF\u2E00-\u2E7F\u3000-\u303F\uFE00-\uFE0F\U0000200D\U000020E3\U000026A0\U000026A1\U000026AA\U000026AB\U000026AD\U000026AE\U000026AF\U000026B0\U000026B1\U000026B2\U000026B3\U000026B4\U000026B5\U000026B6\U000026B7\U000026B8\U000026B9\U000026BA\U000026BB\U000026BC\U000026BD\U000026BE\U000026BF\U000026C0\U000026C1\U000026C2\U000026C3\U000026C4\U000026C5\U000026C6\U000026C7\U000026C8\U000026C9\U000026CA\U000026CB\U000026CC\U000026CD\U000026CE\U000026CF\U000026D0\U000026D1\U000026D2\U000026D3\U000026D4\U000026D5\U000026D6\U000026D7\U000026D8\U000026D9\U000026DA\U000026DB\U000026DC\U000026DD\U000026DE\U000026DF\U000026E0\U000026E1\U000026E2\U000026E3\U000026E4\U000026E5\U000026E6\U000026E7\U000026E8\U000026E9\U000026EA\U000026EB\U000026EC\U000026ED\U000026EE\U000026EF\U000026F0\U000026F1\U000026F2\U000026F3\U000026F4\U000026F5\U000026F6\U000026F7\U000026F8\U000026F9\U000026FA\U000026FB\U000026FC\U000026FD\U000026FE\U000026FF\U0000270A\U0000270B\U0000270C\U0000270D\U0000270E\U0000270F\U00002712\U00002714\U00002716\U0000271D\U00002721\U00002728\U0000274C\U0000274E\U00002753\U00002754\U00002755\U00002757\U00002763\U00002764\U00002795\U00002797\U000027A1\U000027B0\U000027BF\u00A9\u00AE\u2122\u2139\u2194-\u2199\u21A9-\u21AA\u231A\u231B\u25AA-\u25AB\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614\u2615\u2618\u261D\u2620\u2622\u2623\u2626\u262A\u262E\u262F\u2638-\u263A\u2648-\u2653\u2660\u2663\u2665\u2666\u2668\u267B\u267F\u2692-\u2697\u2699\u269B\u269C\u26A0\u26A1\u26AA\u26AB\u26B0\u26B1\u26BD\u26BE\u26C4\u26C5\u26C8\u26CF\u26D1\u26D3\u26D4\u26E3\u26E8\u26F0-\u26F5\u26F7-\u26FA\u26FD\u2705\u2708-\u270C\u270F\u2712\u2716\u271D\u2721\u2733\u2734\u2747\u274C\u274E\u2757\u2795\u2797\u27B0\u27BF\u2B05-\u2B07\u2B1B\u2B1C\u2B50\u2B55\u3297\u3299\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF\U0001F100-\U0001F1FF\U0001F200-\U0001F2FF\U0001F300-\U0001F5FF\U0001F600-\U0001F64F\U0001F680-\U0001F6FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U000021A9\U000021AA\U0000231A\U0000231B\U000023E9\U000023EA\U000023EB\U000023EC\U000023F0\U000023F3\U000025C0\U000025FB\U000025FC\U000025FD\U000025FE\U0000261D\U00002620\U00002622\U00002623\U00002626\U0000262A\U0000262E\U0000262F\U00002638-\U0000263A\U00002648-\U00002653\U00002660\U00002663\U00002665\U00002666\U00002668\U0000267B\U0000267F\U00002692-\U00002697\U00002699\U0000269B\U0000269C\U000026A0\U000026A1\U000026AA\U000026AB\U000026AE\U000026AF\U000026B0\U000026B1\U000026B2\U000026B3\U000026B4\U000026B5\U000026B6\U000026B7\U000026B8\U000026B9\U000026BA\U000026BB\U000026BC\U000026BD\U000026BE\U000026BF\U000026C0\U000026C1\U000026C2\U000026C3\U000026C4\U000026C5\U000026C6\U000026C7\U000026C8\U000026CF\U000026D1\U000026D3\U000026D4\U000026E3\U000026E8\U000026F0-\U000026F5\U000026F7-\U000026FA\U000026FD\U00002705\U00002708-\U0000270C\U0000270F\U00002712\U00002716\U0000271D\U00002721\U00002733\U00002734\U00002747\U0000274C\U0000274E\U00002757\U00002795\U00002797\U000027B0\U000027BF\U00002B05-\U00002B07\U00002B1B\U00002B1C\U00002B50\U00002B55\U00003297\U00003299\U0000200D\U0000FE0F\u00A9\u00AE\u2122\u2139\u2194-\u2199\u21A9-\u21AA\u231A\u231B\u25AA-\u25AB\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614\u2615\u2618\u261D\u2620\u2622\u2623\u2626\u262A\u262E\u262F\u2638-\u263A\u2648-\u2653\u2660\u2663\u2665\u2666\u2668\u267B\u267F\u2692-\u2697\u2699\u269B\u269C\u26A0\u26A1\u26AA\u26AB\u26B0\u26B1\u26BD\u26BE\u26C4\u26C5\u26C8\u26CF\u26D1\u26D3\u26D4\u26E3\u26E8\u26F0-\u26F5\u26F7-\u26FA\u26FD\u2705\u2708-\u270C\u270F\u2712\u2716\u271D\u2721\u2733\u2734\u2747\u274C\u274E\u2757\u2795\u2797\u27B0\u27BF\u2B05-\u2B07\u2B1B\u2B1C\u2B50\u2B55\u3297\u3299]+$', re.UNICODE)
+    # and ensure message is not just an emoji or starts/ends with one.
     
-    # If the text is just emojis, replace it with a generic text
-    if emoji_pattern.match(text.strip()):
-        text = "Mmm... that's cute, baby! What else do you want to tell me?"
-        logging.info(f"Prevented sticker-like response: '{text}'")
+    # Regex to find emojis at the start or end of the string, or a string that is only emojis.
+    # This is a robust emoji regex, it covers many Unicode emoji blocks.
+    emoji_pattern = re.compile(
+        r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF'
+        r'\u2600-\u26FF\u2700-\u27BF\u2300-\u23FF\u2B50\u2B00-\u2BFF\u2E00-\u2E7F\u3000-\u303F\uFE00-\uFE0F'
+        r'\U0000200D\U000020E3\U000026A0\U000026A1\U000026AA\U000026AB\U000026AD\U000026AE\U000026AF\U000026B0'
+        r'\U000026B1\U000026B2\U000026B3\U000026B4\U000026B5\U000026B6\U000026B7\U000026B8\U000026B9\U000026BA'
+        r'\U000026BB\U000026BC\U000026BD\U000026BE\U000026BF\U000026C0\U000026C1\U000026C2\U000026C3\U000026C4'
+        r'\U000026C5\U000026C6\U000026C7\U000026C8\U000026C9\U000026CA\U000026CB\U000026CC\U000026CD\U000026CE'
+        r'\U000026CF\U000026D0\U000026D1\U000026D2\U000026D3\U000026D4\U000026D5\U000026D6\U000026D7\U000026D8'
+        r'\U000026D9\U000026DA\U000026DB\U000026DC\U000026DD\U000026DE\U000026DF\U000026E0\U000026E1\U000026E2'
+        r'\U000026E3\U000026E4\U000026E5\U000026E6\U000026E7\U000026E8\U000026E9\U000026EA\U000026EB\U000026EC'
+        r'\U000026ED\U000026EE\U000026EF\U000026F0-\U000026F5\U000026F7-\U000026FA\U000026FD\U00002705\U00002708-\U0000270C'
+        r'\U0000270F\U00002712\U00002716\U0000271D\U00002721\U00002733\U00002734\U00002747\U0000274C\U0000274E'
+        r'\U00002757\U00002795\U00002797\U000027B0\U000027BF\U00002B05-\U00002B07\U00002B1B\U00002B1C\U00002B50\U00002B55'
+        r'\U00003297\U00003299\U0000200D\U0000FE0F\u00A9\u00AE\u2122\u2139\u2194-\u2199\u21A9-\u21AA\u231A\u231B'
+        r'\u23E9\u23EA\u23EB\u23EC\u23F0\u23F3\u25C0\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614\u2615\u2618'
+        r'\u261D\u2620\u2622\u2623\u2626\u262A\u262E\u262F\u2638-\u263A\u2648-\u2653\u2660\u2663\u2665\u2666'
+        r'\u2668\u267B\u267F\u2692-\u2697\u2699\u269B\u269C\u26A0\u26A1\u26AA\u26AB\u26AE\u26AF\u26B0\u26B1'
+        r'\u26BD\u26BE\u26C4\u26C5\u26C8\u26CF\u26D1\u26D3\u26D4\u26E3\u26E8\u26F0-\u26F5\u26F7-\u26FA\u26FD\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF'
+        r'\U0001F100-\U0001F1FF\U0001F200-\U0001F2FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF'
+        r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF]'
+    )
 
+    # Replace any standalone emojis or messages that start/end with emojis
+    # The system prompt already guides the model to use emojis naturally *within* sentences.
+    # This prevents edge cases where the model might generate a response that is just an emoji or starts/ends poorly.
+    
+    # If the text is only emojis and whitespace
+    if emoji_pattern.fullmatch(text.strip()):
+        text = "Mmm... that's cute, baby! What else do you want to tell me?"
+        logging.info(f"Prevented sticker-like (emoji-only) response: '{text}'")
+    else:
+        # Remove emojis at the beginning of the string
+        text = re.sub(r'^\s*' + emoji_pattern.pattern + r'\s*', '', text)
+        # Remove emojis at the end of the string
+        text = re.sub(r'\s*' + emoji_pattern.pattern + r'\s*$', '', text)
+        # If after removing leading/trailing emojis, the string is empty or just whitespace,
+        # fallback to a default message.
+        if not text.strip():
+            text = "Hmm, baby... I'm not sure what to say about that."
+        
     parts = []
     buffer = ""
     for char in text:
         buffer += char
-        if char in ["?", "!", "..."]:
+        # Only split on "?", "!", "...", but only if it's not the very beginning of a sentence.
+        # This helps keep natural flow and avoids splitting mid-sentence if it's "..." in the middle.
+        if char in ["?", "!", "."] and len(buffer.strip()) > 1 and buffer.strip().endswith((char, char + char, char + char + char)):
             parts.append(buffer.strip())
             buffer = ""
     if buffer:
@@ -97,11 +137,12 @@ async def send_multiple_messages(update: Update, text: str):
 
 async def generate_response(user_id: int, message: str):
     history = user_data[user_id].get("history", [])
-    messages = [{"role": "system", "content": system_prompt}] + history[-10:] + [{"role": "user", "content": message}]
+    # Ensure system prompt is always at the beginning
+    messages_for_llm = [{"role": "system", "content": system_prompt}] + history[-10:] + [{"role": "user", "content": message}]
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages
+            messages=messages_for_llm
         )
         reply = response.choices[0].message.content.strip()
         user_data[user_id]["history"].append({"role": "user", "content": message})
@@ -114,6 +155,11 @@ async def generate_response(user_id: int, message: str):
         return "Oops... Something went wrong baby 😢 Try again later."
 
 async def send_previews(user_id: int):
+    # NEW: Only send previews if user is NOT unlocked
+    if user_data[user_id].get("unlocked", False):
+        logging.info(f"User {user_id} is unlocked, skipping preview sending.")
+        return
+
     chat_id = user_id
     messages = [
         "Here’s something to tempt you 🔥",
@@ -138,74 +184,41 @@ async def send_previews(user_id: int):
 async def check_inactivity():
     while True:
         now = datetime.utcnow()
-        for user_id, data in user_data.items():
+        for user_id, data in list(user_data.items()): # Iterate over a copy to allow modification
             last = data.get("last_interaction")
             unlocked = data.get("unlocked", False)
-            if last and not unlocked:
+            if last and not unlocked: # Only send previews if not unlocked
                 last_time = datetime.fromisoformat(last)
-                if now - last_time > timedelta(minutes=15):
+                # NEW: Extended inactivity period for sending previews to 30 minutes
+                if now - last_time > timedelta(minutes=30): 
                     try:
+                        logging.info(f"User {user_id} inactive for over 30 mins and not unlocked. Sending previews.")
                         await send_previews(int(user_id))
-                        user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+                        # Update last_interaction to prevent immediate re-sending
+                        user_data[str(user_id)]["last_interaction"] = datetime.utcnow().isoformat()
                         save_data()
                     except Exception as e:
-                        logging.error(f"[ERROR send_previews] {e}")
+                        logging.error(f"[ERROR send_previews in check_inactivity] {e}")
         await asyncio.sleep(60)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+async def process_user_messages(user_id: int, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Processes accumulated messages for a user and generates a single response."""
+    if user_id not in user_data or not user_data[user_id].get("message_queue"):
+        return
 
-    # Initialize user data if not present
-    if user_id not in user_data:
-        user_data[user_id] = {
-            "messages": 0,
-            "unlocked": False,
-            "history": [],
-            "bot_sent": 0,
-            "last_interaction": datetime.utcnow().isoformat(),
-            "sent_intro": False,
-            "sent_nudes": False
-        }
-        save_data()
-    
-    # NEW: Check if the message is a sticker and explicitly return
-    if update.message.sticker:
-        logging.info(f"Sticker received from {user_id}. Ignoring and not responding.")
-        return # Explicitly stop processing if it's a sticker
+    # Join all queued messages into a single string for the LLM
+    combined_message = " ".join(user_data[user_id]["message_queue"])
+    user_data[user_id]["message_queue"].clear() # Clear the queue after combining
 
-    # Delay for the first message after /start (before sending audio)
-    # This specifically targets the /start command as the trigger for the initial delay
-    if not user_data[user_id]["sent_intro"] and update.message.text and update.message.text.startswith('/start'):
-        await simulate_typing(update, min_delay=10.0, max_delay=10.0) # 10-second typing simulation
-        # The intro audio will be sent right after this typing delay
-        audio_path = "audio/intro.ogg"
-        if os.path.exists(audio_path):
-            with open(audio_path, "rb") as voice:
-                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
-        user_data[user_id]["sent_intro"] = True
-        save_data() # Save after sending intro
-        return # Important: Return after sending intro to avoid processing as a regular message immediately
+    # Handle specific keywords based on the combined message
+    text_lower = combined_message.lower()
 
-    user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
-
-    # Handle incoming photos/documents
-    if update.message.photo or update.message.document:
-        if not user_data[user_id].get("sent_nudes"):
-            await send_previews(user_id)
-            user_data[user_id]["sent_nudes"] = True
-            save_data()
-            return
-
-    text_raw = update.message.text or ""
-    text = text_raw.lower()
-
-    # Handle specific keywords
-    if any(word in text for word in ["link", "unlock", "vip", "stripe"]):
+    if any(word in text_lower for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
         await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
         return
 
-    if any(word in text for word in ["send audio", "send me audio", "your voice", "send your voice", "voice message",
+    if any(word in text_lower for word in ["send audio", "send me audio", "your voice", "send your voice", "voice message",
 "can you talk?", "say something", "talk to me", "i want your voice",
 "send voice", "send voice message", "voice please", "audio please",
 "i want to hear you", "let me hear you", "say hi", "say my name",
@@ -221,7 +234,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"You liked that? 😘 The rest is in VIP access, baby 💖 {STRIPE_LINK}")
         return
 
-    if any(word in text for word in ["nudes", "nude", "send nudes", "send nude", "your pic", "send you pic", "send me nudes", "i want nudes", "nude now", "your nude", "your nudes", "nude pic", "naked pic", "send you naked", "let me see you", "show me your body",
+    if any(word in text_lower for word in ["nudes", "nude", "send nudes", "send nude", "your pic", "send you pic", "send me nudes", "i want nudes", "nude now", "your nude", "your nudes", "nude pic", "naked pic", "send you naked", "let me see you", "show me your body",
 "show me everything", "show me more", "send sexy pic", "send hot pic",
 "send me something hot", "can i see you?", "i want to see you", "show me something",
 "show me naked", "show boobs", "show me boobs", "let me see your nudes",
@@ -249,7 +262,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_previews(user_id)
             return
 
-    if text.strip() == UNLOCK_CODE:
+    if text_lower.strip() == UNLOCK_CODE.lower(): # Case-insensitive check for unlock code
         user_data[user_id]["unlocked"] = True
         save_data()
         await simulate_typing(update)
@@ -261,12 +274,90 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Baby… I love talking to you, but unlock me for more 🔥\n{STRIPE_LINK}")
         return
 
-    # Generate response
-    reply = await generate_response(user_id, text_raw)
+    # Generate response based on combined message
+    reply = await generate_response(user_id, combined_message)
     user_data[user_id]["messages"] += 1
     user_data[user_id]["bot_sent"] += 1
     save_data()
     await send_multiple_messages(update, reply)
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id) # Ensure user_id is string for consistent dictionary keys
+
+    # Initialize user data if not present
+    if user_id not in user_data:
+        user_data[user_id] = {
+            "messages": 0,
+            "unlocked": False,
+            "history": [],
+            "bot_sent": 0,
+            "last_interaction": datetime.utcnow().isoformat(),
+            "sent_intro": False,
+            "sent_nudes": False,
+            "message_queue": [] # NEW: Queue for user messages
+        }
+        save_data()
+    
+    # NEW: Check if the message is a sticker and explicitly ignore
+    if update.message.sticker:
+        logging.info(f"Sticker received from {user_id}. Ignoring and not responding.")
+        user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+        save_data()
+        return 
+
+    # Handle incoming photos/documents - this is independent of text messages
+    if update.message.photo or update.message.document:
+        user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+        if not user_data[user_id].get("sent_nudes"):
+            await send_previews(int(user_id)) # Cast to int for send_previews
+            user_data[user_id]["sent_nudes"] = True
+            save_data()
+        else: # If nudes already sent, just re-send previews for new photo/document
+            await send_previews(int(user_id))
+        return # Important: Return after handling photos/documents
+
+    # Process only text messages from this point
+    text_raw = update.message.text
+    if not text_raw:
+        return # Ignore non-text messages that weren't caught by sticker/photo filters
+
+    user_data[user_id]["last_interaction"] = datetime.utcnow().isoformat()
+
+    # NEW: Delay for the first message after /start and play audio
+    if not user_data[user_id]["sent_intro"] and text_raw.startswith('/start'):
+        await simulate_typing(update, min_delay=10.0, max_delay=10.0) # 10-second typing simulation
+        audio_path = "audio/intro.ogg"
+        if os.path.exists(audio_path):
+            with open(audio_path, "rb") as voice:
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice)
+        user_data[user_id]["sent_intro"] = True
+        save_data()
+        return # Return after sending intro to avoid immediate text processing
+
+    # Add the current message to the user's message queue
+    user_data[user_id]["message_queue"].append(text_raw)
+    save_data() # Save after updating message queue
+
+    # NEW: If there's an existing pending response task, cancel it.
+    if user_id in user_pending_responses:
+        user_pending_responses[user_id].cancel()
+        logging.info(f"Cancelled pending response for user {user_id}. Adding new message to queue.")
+
+    # Start a new task that will wait a short period and then process messages
+    async def respond_after_delay():
+        try:
+            # Wait for a short period to see if more messages arrive
+            await asyncio.sleep(6.0) # Wait 1.5 seconds for more messages
+            await process_user_messages(user_id, update, context)
+        except asyncio.CancelledError:
+            logging.info(f"Response for user {user_id} was cancelled due to new message.")
+        finally:
+            if user_id in user_pending_responses:
+                del user_pending_responses[user_id] # Clean up the task from the dictionary
+
+    user_pending_responses[user_id] = asyncio.create_task(respond_after_delay())
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # The /start command now correctly triggers the initial delay and audio in handle_message
