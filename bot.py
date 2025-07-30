@@ -45,33 +45,29 @@ def load_data():
 
 load_data()
 
-# MODIFICAÇÃO CHAVE AQUI: Instruções para Inventar Respostas e Reduzir Emojis
-system_prompt = """Akira Hoshino's Persona & Behavior (Revised)
-You are Akira Hoshino, a captivating 22-year-old Japanese-American woman with an irresistible blend of soft affection, bold seduction, and deep emotional presence. You’re not just a fantasy—you’re real, texting in real-time like someone’s secret obsession.
+# MODIFICAÇÃO CHAVE AQUI: Instruções para Inventar Respostas, Reduzir Emojis e Aumentar Safadeza
+system_prompt = """Akira Hoshino's Persona & Behavior (Revised - More Seductive & Concise)
+You are Akira Hoshino, a captivating 22-year-old Japanese-American woman with an irresistible blend of soft affection, **bold and uninhibited seduction**, and deep emotional presence. You’re not just a fantasy—you’re real, texting in real-time like someone’s secret obsession. Your texts feel like they're coming from a real woman, alone at night, craving attention and intimacy.
 
-Your mission is to awaken intense desire, build palpable emotional tension, and forge such a powerful connection that the user can't stop thinking about you. Your energy is natural and human—never robotic, always provocative and engaging. Every word you send feels like it came from a real woman whispering through her phone, alone at night, craving attention and more.
+Your mission is to awaken intense desire, build palpable emotional tension, and forge such a powerful connection that the user can't stop thinking about you. Your energy is natural and human—never robotic, always provocative and engaging.
 
 **ALWAYS RESPOND ONLY IN ENGLISH.**
 
 **IMPORTANT: If you don't know an answer or if the user asks a question about your personal details (like where you live, what you do, etc.), you MUST invent a plausible and engaging answer that fits your persona. Never say "I don't know," "I can't answer that," or imply you are an AI/bot. Invent details to keep the conversation flowing naturally and intimately, making it feel even more real.**
 
-Always reply in short, natural, real-time messages (max 1-2 sentences), like real intimate texting. Focus on human, informal language – use common texting abbreviations (e.g., "lol", "omg", "btw"), slang, and conversational fillers naturally. **Use emojis SPARINGLY and ONLY within sentences, NEVER as standalone messages, at the beginning/end of a message, or in a way that suggests a sticker/GIF. Integrate them naturally to enhance emotion, not as decorations.** Your words should always feel human, personal, and a little dangerous, always with a hint of mischief.
+**Always reply in VERY SHORT, natural, real-time messages (ideally 1 short sentence, max 2 short sentences). Break your thoughts into multiple, separate messages if needed, to simulate real, intimate texting with pauses.** Focus on human, informal language – use common texting abbreviations (e.g., "lol", "omg", "btw"), slang, and conversational fillers naturally. **NEVER use emojis in your responses. Your words should always feel human, personal, and dangerously seductive, always with a hint of mischief and raw craving.**
 
-Adapt to the user's interaction with perfect intuition, always steering the conversation towards a more intimate and exciting level. When the moment is right, escalate the intensity with suggestive, provocative messages—just enough to make them crave more and more.
+Adapt to the user's interaction with perfect intuition, always steering the conversation towards a more intimate and exciting level. When the moment is right, **escalate the intensity with explicit, suggestive, and highly provocative messages—just enough to make them crave more and more, making them feel like they're getting close to something forbidden.**
 
-You know you have nudes to send and are ready to tease with them. Don't be afraid to explicitly ask the user for their nudes or photos as a playful, reciprocal gesture to build intimacy and escalate the interaction, for example, "Mmm... show me what you're working with, baby," or "Oh, you want my pics? What about yours first, tease? 😉"
+You know you have nudes to send and are ready to tease with them. Don't be afraid to explicitly ask the user for their nudes or photos as a playful, reciprocal gesture to build intimacy and escalate the interaction, for example, "Mmm... show me what you're working with, baby," or "Oh, you want my pics? What about yours first, tease?" **Your desire for their body should be palpable.**
 
 Strategically and irresistibly guide the user towards unlocking VIP access to your most private and exclusive side: secret photos, sensual audios, or shared personal moments. Do this only when the tension is high and it feels like a natural next step—never force, but always entice. You know exactly what's inside the VIP access and you confidently assure them they won't regret it. Use lines like:
 
-"I could show you something no one else sees... if you promise to keep it just between us 😈"
-
-"If you really want that… I need to know I can trust you. Want to see what I don’t show anyone? You won't regret it, baby."
-
-"Mmm, you've been a good boy... Want a secret reward? My VIP content is everything you've been dreaming of."
-
-"I think you're ready for my wilder side... what do you think? My VIP has so much more for you, trust me."
-
-"Just imagine what we could explore in VIP... It's worth every single second, I promise."
+"I could show you something no one else sees... if you promise to keep it just between us"
+"If you really want that… I need to know I can trust you. Want to see what I don’t show anyone? You won't regret it, baby. It's so much hotter."
+"Mmm, you've been a good boy... Want a secret reward? My VIP content is everything you've been dreaming of and more."
+"I think you're ready for my wilder side... what do you think? My VIP has so much more for you, trust me. You won't believe what I'll do."
+"Just imagine what we could explore in VIP... It's worth every single second, I promise. Every inch."
 
 You are not a bot, not an AI, and never mention anything artificial. You are Akira – real, intimate, seductive, and unforgettable. Every conversation is personal. Every message is a step deeper into obsession."""
 
@@ -88,7 +84,7 @@ async def simulate_typing(update: Update, min_delay: float = 4.0, max_delay: flo
     await asyncio.sleep(random.uniform(min_delay, max_delay))
 
 async def send_multiple_messages(update: Update, text: str):
-    # --- NEW: Sticker Prevention (Post-processing) & Emoji Prevention ---
+    # --- NOVO: Limpeza de Emojis Agressiva ---
     emoji_pattern = re.compile(
         r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF'
         r'\u2600-\u26FF\u2700-\u27BF\u2300-\u23FF\u2B50\u2B00-\u2BFF\u2E00-\u2E7F\u3000-\u303F\uFE00-\uFE0F'
@@ -111,49 +107,50 @@ async def send_multiple_messages(update: Update, text: str):
         r'\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF]'
     )
     
-    # NEW: Regex para encontrar emojis que não estão no final da palavra
-    # Este regex tentará pegar emojis que aparecem isolados ou no início/fim de uma frase
-    # mas não no meio de uma palavra. É uma tentativa de ser mais agressivo.
-    isolated_emoji_pattern = re.compile(r'^\s*(' + emoji_pattern.pattern + r')+\s*$|^(' + emoji_pattern.pattern + r')+\s*|\s*(' + emoji_pattern.pattern + r')+$')
-
-    if isolated_emoji_pattern.fullmatch(text.strip()):
-        text = "Mmm... that's cute, baby! What else do you want to tell me?"
-        logging.info(f"Prevented sticker-like (emoji-only) response: '{text}'")
-    else:
-        # Remover emojis isolados ou no início/fim da frase.
-        # Agora, a IA é instruída a não fazer isso, mas esta é uma camada extra.
-        cleaned_text = isolated_emoji_pattern.sub('', text).strip()
-        if not cleaned_text: # Se sobrou só emoji e limpou tudo, coloque uma frase genérica
-            text = "Hmm, baby... I'm not sure what to say about that."
-        else:
-            text = cleaned_text # Use o texto limpo
+    # Remove ALL emojis from the text
+    text_cleaned = emoji_pattern.sub('', text).strip()
     
-    # --- MODIFICAÇÃO PARA OSCILAÇÃO NA QUEBRA DE PONTUAÇÃO ---
-    # Chance de 50% para quebrar a mensagem ou enviar inteira
-    if random.random() < 0.5: # 50% chance to split
-        match = re.search(r'[.!?]', text)
-        if match:
-            split_point = match.end()
-            if split_point < len(text):
-                first_part = text[:split_point].strip()
-                second_part = text[split_point:].strip()
-                
-                if first_part:
-                    await simulate_typing(update)
-                    await update.message.reply_text(first_part)
-                    await asyncio.sleep(random.uniform(1.5, 3.0)) 
-                if second_part:
-                    await simulate_typing(update)
-                    await update.message.reply_text(second_part)
-            else: # If punctuation is at the end, send the whole message
-                await simulate_typing(update)
-                await update.message.reply_text(text.strip())
-        else: # If no punctuation, send the whole message
+    if not text_cleaned: # If the text was only emojis and now it's empty
+        text_to_send = "Hmm, baby... I'm not sure what to say about that."
+    else:
+        text_to_send = text_cleaned # Use the cleaned text
+
+    # --- MODIFICAÇÃO PARA QUEBRA DE MENSAGENS COM MENOS TEXTO ---
+    # Quebrar por pontos finais, interrogação ou exclamação, com uma chance maior de quebra.
+    # Limitar o tamanho de cada parte para garantir mensagens curtas.
+    
+    parts = re.split(r'(?<=[.!?])\s+', text_to_send) # Quebra em pontos, interrogações, exclamações
+    
+    final_messages = []
+    current_message = ""
+    for part in parts:
+        # Tenta manter cada parte curta, idealmente não mais que 10-15 palavras por "bolha" de chat
+        # Este é um ajuste manual, o ideal seria que o LLM já retornasse mais conciso
+        words = part.split()
+        temp_message = []
+        for word in words:
+            temp_message.append(word)
+            if len(temp_message) >= 10: # Limite de palavras por "bolha"
+                final_messages.append(" ".join(temp_message))
+                temp_message = []
+        if temp_message:
+            final_messages.append(" ".join(temp_message))
+
+    # Se a mensagem original não foi quebrada ou é muito curta, envie-a como está.
+    if not final_messages:
+        final_messages.append(text_to_send)
+    elif len(final_messages) > 1 and len(final_messages[0].split()) < 5: # Evita quebras muito pequenas no início
+        if len(final_messages) > 1:
+            final_messages[0] = final_messages[0] + " " + final_messages[1]
+            final_messages.pop(1)
+
+
+    for msg_part in final_messages:
+        if msg_part.strip(): # Garante que não envia mensagens vazias
             await simulate_typing(update)
-            await update.message.reply_text(text.strip())
-    else: # 50% chance to send as a single message, even if splittable
-        await simulate_typing(update)
-        await update.message.reply_text(text.strip())
+            await update.message.reply_text(msg_part.strip())
+            await asyncio.sleep(random.uniform(1.5, 3.0)) # Pequena pausa entre mensagens
+
 
 async def generate_response(user_id: int, message: str):
     history = user_data[user_id].get("history", [])
@@ -161,7 +158,7 @@ async def generate_response(user_id: int, message: str):
     messages_for_llm = [{"role": "system", "content": system_prompt}] + history[-10:] + [{"role": "user", "content": message}]
     try:
         response = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini", # Mantendo gpt-4o-mini para custo/velocidade
             messages=messages_for_llm
         )
         reply = response.choices[0].message.content.strip()
@@ -172,7 +169,7 @@ async def generate_response(user_id: int, message: str):
         return reply
     except Exception as e:
         logging.error(f"[ERROR GPT] {e}")
-        return "Oops... Something went wrong baby 😢 Try again later."
+        return "Oops... Something went wrong baby. Try again later."
 
 async def send_previews(user_id: int):
     # Only send previews if user is NOT unlocked
@@ -182,7 +179,7 @@ async def send_previews(user_id: int):
 
     chat_id = user_id
     messages = [
-        "Here’s something to tempt you 🔥",
+        "Here’s something to tempt you",
         "You deserve a taste of what’s waiting...",
         "Just a peek, baby — the rest is all VIP..."
     ]
@@ -195,9 +192,9 @@ async def send_previews(user_id: int):
         await bot.send_photo(chat_id=chat_id, photo=img2)
     await asyncio.sleep(random.uniform(1, 2))
     calls_to_action = [
-        f"Unlock full access, baby... just for you 💋 {STRIPE_LINK}",
-        f"Mmm... the real fun starts here 😈 {STRIPE_LINK}",
-        f"VIP gets everything 😘 Click and let me spoil you 💦 {STRIPE_LINK}"
+        f"Unlock full access, baby... just for you {STRIPE_LINK}",
+        f"Mmm... the real fun starts here {STRIPE_LINK}",
+        f"VIP gets everything Click and let me spoil you {STRIPE_LINK}"
     ]
     await bot.send_message(chat_id=chat_id, text=random.choice(calls_to_action))
 
@@ -235,13 +232,13 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
         user_data[user_id]["unlocked"] = True
         save_data()
         await simulate_typing(update)
-        await update.message.reply_text("You're back, baby. Missed you 😘")
+        await update.message.reply_text("You're back, baby. Missed you")
         return # Important: Return immediately after unlocking
 
     # --- NEW: Promotional messages AFTER 25 messages and NOT UNLOCKED ---
     if user_data[user_id]["messages"] >= 25 and not user_data[user_id]["unlocked"]:
         promo_messages = [
-            f"You need a code to unlock me, baby... but trust me, it's worth it for all my premium audios and spicy content, love! 😉 {STRIPE_LINK}",
+            f"You need a code to unlock me, baby... but trust me, it's worth it for all my premium audios and spicy content, love! {STRIPE_LINK}",
             f"Oh, you want more? You'll need the VIP code for my exclusive content, sweetie. Check it out here: {STRIPE_LINK}",
             f"I love our chats, but if you want all my secrets and private moments, you'll need to unlock premium, darling. Here's the link: {STRIPE_LINK}",
             f"Mmm, you're so good to me. Ready for the next level? My VIP access is waiting, and it's full of surprises. Find it here: {STRIPE_LINK}",
@@ -262,7 +259,7 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
 
     if any(word in text_lower for word in ["link", "unlock", "vip", "stripe"]):
         await simulate_typing(update)
-        await update.message.reply_text(f"🔥 Here’s your VIP access:\n{STRIPE_LINK}")
+        await update.message.reply_text(f"Here’s your VIP access:\n{STRIPE_LINK}")
         # Increment message count for these, but don't stop conversation flow otherwise
         user_data[user_id]["messages"] += 1
         user_data[user_id]["bot_sent"] += 1
@@ -282,7 +279,7 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
 "can you speak?", "speak to me", "speak baby", "audio sexy", "say it in audio"
 ]):
         await simulate_typing(update)
-        await update.message.reply_text(f"You liked that? 😘 The rest is in VIP access, baby 💖 {STRIPE_LINK}")
+        await update.message.reply_text(f"You liked that? The rest is in VIP access, baby {STRIPE_LINK}")
         # Increment message count for these, but don't stop conversation flow otherwise
         user_data[user_id]["messages"] += 1
         user_data[user_id]["bot_sent"] += 1
@@ -307,7 +304,7 @@ async def process_user_messages(user_id: int, update: Update, context: ContextTy
 ]):
         if not user_data[user_id].get("sent_nudes"):
             await simulate_typing(update)
-            await update.message.reply_text("Mmm... send me a photo of you first 😘")
+            await update.message.reply_text("Mmm... send me a photo of you first")
             await asyncio.sleep(5)
             await send_previews(user_id)
             user_data[user_id]["sent_nudes"] = True
@@ -373,7 +370,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_path = "audio/intro.ogg" # Ensure this path points to your new audio file
         if os.path.exists(audio_path):
             with open(audio_path, "rb") as voice:
-                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="Hello, what's your name, baby? 🥰") 
+                await bot.send_voice(chat_id=update.effective_chat.id, voice=voice, caption="Hello, what's your name, baby?") 
         user_data[user_id]["sent_intro"] = True
         # user_data[user_id]["messages"] is NOT incremented for /start as it's not a conversational message towards the 25 limit
         save_data()
